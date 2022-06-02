@@ -1,3 +1,3 @@
-# swift-http3
+# swift-quic
 
-A description of this package.
+Swift implementation of the quic protocol.
