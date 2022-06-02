@@ -1,28 +1,58 @@
 // swift-tools-version: 5.6
-// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
-    name: "swift-http3",
-    products: [
-        // Products define the executables and libraries a package produces, and make them visible to other packages.
-        .library(
-            name: "swift-http3",
-            targets: ["swift-http3"]),
-    ],
-    dependencies: [
+  name: "swift-http3",
+  products: [
+    .library(
+      name: "Quic",
+      targets: ["Quic"]
+    ),
+    .executable(
+      name: "client",
+      targets: ["EchoClient"]
+    ),
+    .executable(
+      name: "server",
+      targets: ["EchoServer"]
+    ),
+  ],
+  dependencies: [
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
-    ],
-    targets: [
-        // Targets are the basic building blocks of a package. A target can define a module or a test suite.
-        // Targets can depend on other targets in this package, and on products in packages this package depends on.
-        .target(
-            name: "swift-http3",
-            dependencies: []),
-        .testTarget(
-            name: "swift-http3Tests",
-            dependencies: ["swift-http3"]),
-    ]
+  ],
+
+  targets: [
+    .target(
+      name: "Quic",
+      dependencies: []
+    ),
+    .testTarget(
+      name: "QuicTests",
+      dependencies: ["Quic"]
+    ),
+
+    .executableTarget(
+      name: "EchoClient",
+      dependencies: ["Quic"],
+      path: "Sources/Echo/Client"
+    ),
+    .testTarget(
+      name: "clientTests",
+      dependencies: ["EchoClient"],
+      path: "Tests/EchoTests/ClientTests"
+    ),
+
+    .executableTarget(
+      name: "EchoServer",
+      dependencies: ["Quic"],
+      path: "Sources/Echo/Server"
+    ),
+    .testTarget(
+      name: "serverTests",
+      dependencies: ["EchoServer"],
+      path: "Tests/EchoTests/ServerTests"
+    ),
+  ]
 )

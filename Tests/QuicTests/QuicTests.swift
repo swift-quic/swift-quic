@@ -1,11 +1,11 @@
 import XCTest
-@testable import swift_http3
+@testable import Quic
 
-final class swift_http3Tests: XCTestCase {
+final class QuicTests: XCTestCase {
     func testExample() throws {
         // This is an example of a functional test case.
         // Use XCTAssert and related functions to verify your tests produce the correct
         // results.
-        XCTAssertEqual(swift_http3().text, "Hello, World!")
+        XCTAssertEqual(Quic().text, "Hello, World!")
     }
 }

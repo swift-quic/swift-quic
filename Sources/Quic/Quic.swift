@@ -1,4 +1,4 @@
-public struct swift_http3 {
+public struct Quic {
     public private(set) var text = "Hello, World!"
 
     public init() {
