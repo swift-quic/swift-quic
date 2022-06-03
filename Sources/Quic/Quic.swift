@@ -4,3 +4,5 @@ public struct Quic {
     public init() {
     }
 }
+
+public struct Server {}
