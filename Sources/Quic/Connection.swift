@@ -31,21 +31,17 @@ actor Peer {
     peer = connection
   }
 
-  private var sent = 0
-  private var last = 0
-  private var received = [Int: String]()
+  private var received = [String]()
 
   private let address = UUID()
   public var localAddress: UUID { address }
   public var remoteAddress: UUID? { peer.localAddress }
 
   func send() -> String? {
-    sent += 1
-    return received[last]
+    return received.last
   }
 
   func receive(_ new: String) {
-    received[last] = new
-    last += 1
+    received.append(new)
   }
 }
