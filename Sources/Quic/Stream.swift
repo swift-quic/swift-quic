@@ -18,7 +18,7 @@ public struct Stream {
   }
 
   public func receive() async throws -> Data {
-    try await socket.read(1)
+    try await socket.read(1024)
   }
 
   public func send(_ data: Data) async throws {
