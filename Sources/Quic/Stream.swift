@@ -5,18 +5,23 @@
 //  Created by Kenneth Laskoski on 04/06/22.
 //
 
+import Socket
+import Foundation
+
 @available(macOS 10.15.0, *)
 public struct Stream {
-  public let connection: Connection
-  private var peer: Peer! { connection.peer }
-
-  public func receive() async throws -> String {
-    try await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-    return await peer.send() ?? "###Empty###"
+  private let connection: Connection
+  private let socket: Socket
+  public init(connection: Connection, socket: Socket) {
+    self.connection = connection
+    self.socket = socket
   }
 
-  public func send(_ data: String) async throws {
-    try await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-    await peer.receive(data)
+  public func receive() async throws -> Data {
+    try await socket.read(1)
+  }
+
+  public func send(_ data: Data) async throws {
+    try await socket.write(data)
   }
 }

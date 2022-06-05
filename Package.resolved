@@ -1,0 +1,23 @@
+{
+  "pins" : [
+    {
+      "identity" : "socket",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PureSwift/Socket.git",
+      "state" : {
+        "revision" : "7f3af74c859be71be2e1539d540bd38c8a9c6f33",
+        "version" : "0.2.2"
+      }
+    },
+    {
+      "identity" : "swift-system",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-system",
+      "state" : {
+        "revision" : "836bc4557b74fe6d2660218d56e3ce96aff76574",
+        "version" : "1.1.1"
+      }
+    }
+  ],
+  "version" : 2
+}
