@@ -7,7 +7,6 @@
 
 import Socket
 
-@available(macOS 10.15.0, *)
 public struct Server {
   private let socket: Socket
   public init() async throws {

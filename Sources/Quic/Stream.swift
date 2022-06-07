@@ -8,7 +8,6 @@
 import Socket
 import Foundation
 
-@available(macOS 10.15.0, *)
 public struct Stream {
   private let connection: Connection
   private let socket: Socket
