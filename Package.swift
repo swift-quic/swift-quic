@@ -7,6 +7,10 @@ let package = Package(
   platforms: [.macOS(.v10_15)],
   products: [
     .library(
+      name: "QuicCore",
+      targets: ["QuicCore"]
+    ),
+    .library(
       name: "Quic",
       targets: ["Quic"]
     ),
@@ -16,8 +20,14 @@ let package = Package(
   ],
   targets: [
     .target(
+      name: "QuicCore",
+      dependencies: []
+    ),
+
+    .target(
       name: "Quic",
       dependencies: [
+        "QuicCore",
         .product(name: "Socket", package: "Socket")
       ]
     ),
