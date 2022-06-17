@@ -7,12 +7,15 @@ struct HeaderForm: RawRepresentable {
     self.rawValue = rawValue
   }
 
-  func isShort() -> Bool {
-    rawValue & 0b10000000 == 0
-  }
+  static let long = HeaderForm(rawValue: 0b10000000)
+  static let short = HeaderForm(rawValue: 0)
 
   func isLong() -> Bool {
     !isShort()
+  }
+
+  func isShort() -> Bool {
+    rawValue & 0b10000000 == 0
   }
 }
 

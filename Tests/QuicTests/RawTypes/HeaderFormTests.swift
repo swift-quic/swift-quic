@@ -5,15 +5,13 @@ import XCTest
 @testable import Quic
 
 final class HeaderFormTests: XCTestCase {
-  func testShort() throws {
-    let short = HeaderForm(rawValue: 0)
-    XCTAssertTrue(short.isShort())
-    XCTAssertFalse(short.isLong())
+  func testLong() throws {
+    XCTAssertTrue(HeaderForm.long.isLong())
+    XCTAssertFalse(HeaderForm.long.isShort())
   }
 
-  func testLong() throws {
-    let long = HeaderForm(rawValue: 0b10000000)
-    XCTAssertTrue(long.isLong())
-    XCTAssertFalse(long.isShort())
+  func testShort() throws {
+    XCTAssertTrue(HeaderForm.short.isShort())
+    XCTAssertFalse(HeaderForm.short.isLong())
   }
 }

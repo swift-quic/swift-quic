@@ -6,9 +6,10 @@ struct ConnectionID: RawRepresentable {
   init(rawValue: [UInt8]) {
     self.rawValue = rawValue
   }
+
+  var length: UInt8 { UInt8(exactly: rawValue.count) ?? 0 }
 }
 
 extension ConnectionID: Sendable, Hashable {}
 
 extension ConnectionID: Codable {}
-
