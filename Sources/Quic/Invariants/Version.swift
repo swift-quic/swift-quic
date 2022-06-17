@@ -11,15 +11,15 @@ struct Version: RawRepresentable {
   static let version1 = Version(rawValue: 1)
 
   func isNegotiation() -> Bool {
-    self == Version.negotiation
+    rawValue == 0
   }
 
   func isForcedNegotiation() -> Bool {
-    self.rawValue & 0x0f0f0f0f == 0x0a0a0a0a
+    rawValue & 0x0f0f0f0f == 0x0a0a0a0a
   }
 
   func isReservedForFutureUse() -> Bool {
-    self.rawValue & 0xffff0000 != 0
+    rawValue & 0xffff0000 != 0
   }
 }
 
