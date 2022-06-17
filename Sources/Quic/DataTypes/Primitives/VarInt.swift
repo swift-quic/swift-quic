@@ -1,8 +1,7 @@
-//  Created by Kenneth Laskoski on 07/06/22.
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
-enum VarInt: Codable {
+enum VarInt {
   case length1(UInt8)
   case length2(UInt16)
   case length4(UInt32)
@@ -44,3 +43,5 @@ enum VarInt: Codable {
     self = .length8(rawValue)
   }
 }
+
+extension VarInt: Codable {}

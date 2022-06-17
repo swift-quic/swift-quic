@@ -1,4 +1,3 @@
-//  Created by Kenneth Laskoski on 07/06/22.
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
@@ -7,6 +6,9 @@ struct Version: RawRepresentable {
   init(rawValue: UInt32) {
     self.rawValue = rawValue
   }
+
+  static let negotiation = Version(rawValue: 0)
+  static let version1 = Version(rawValue: 1)
 
   func isNegotiation() -> Bool {
     self == Version.negotiation
@@ -17,11 +19,10 @@ struct Version: RawRepresentable {
   }
 
   func isReservedForFutureUse() -> Bool {
-    self.rawValue & 0xFFFF0000 == 0
+    self.rawValue & 0xffff0000 != 0
   }
-
-  static let negotiation = Version(rawValue: 0)
-  static let version1 = Version(rawValue: 1)
 }
 
 extension Version: Sendable, Hashable {}
+
+extension Version: Codable {}
