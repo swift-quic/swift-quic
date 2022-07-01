@@ -1,17 +1,24 @@
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
+struct VersionNegotiationHeader: Header {
+  var form: HeaderForm { HeaderForm.long }
+  var version: Version { Version.negotiation }
+
+  var destinationIDLength: UInt8 { destinationID.length }
+  let destinationID: ConnectionID
+
+  var sourceIDLength: UInt8 { sourceID.length }
+  let sourceID: ConnectionID
+}
+
 struct VersionNegotiationPacket: Packet {
-  let header: Header
+  let header: VersionNegotiationHeader
   let payload: [UInt8]
 
   init(destinationID: ConnectionID, sourceID: ConnectionID, versions: [Version]) {
-    header = LongHeader(
-      form: HeaderForm(rawValue: 0b10000000),
-      version: Version.negotiation,
-      destinationIDLength: destinationID.length,
+    header = VersionNegotiationHeader(
       destinationID: destinationID,
-      sourceIDLength: sourceID.length,
       sourceID: sourceID
     )
 
