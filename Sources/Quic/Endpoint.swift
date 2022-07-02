@@ -1,4 +1,3 @@
-//  Created by Kenneth Laskoski on 07/06/22.
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
@@ -52,11 +51,5 @@ extension Role: Sendable, Comparable, Hashable {}
 extension Location: Sendable, Comparable, Hashable {}
 
 public protocol Endpoint {
-  associatedtype PathHandle
-  associatedtype Subscriber
-
   var role: Role { get }
-
-  func receive<Rx, C>(rx: inout Rx, clock: C)
-  func transmit<Tx, C>(tx: inout Tx, clocl: C)
 }

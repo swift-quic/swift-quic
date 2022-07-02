@@ -1,8 +1,10 @@
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
+import ByteArrayCodable
+
 struct VersionNegotiationHeader: Header {
-  var form: HeaderForm { HeaderForm.long }
+  var firstByte: FirstByte { .long }
   var version: Version { Version.negotiation }
 
   var destinationIDLength: UInt8 { destinationID.length }
@@ -14,17 +16,20 @@ struct VersionNegotiationHeader: Header {
 
 struct VersionNegotiationPacket: Packet {
   let header: VersionNegotiationHeader
-  let payload: [UInt8]
+  let versions: [Version]
 
-  init(destinationID: ConnectionID, sourceID: ConnectionID, versions: [Version]) {
+  init(destinationID: ConnectionID, sourceID: ConnectionID) {
     header = VersionNegotiationHeader(
       destinationID: destinationID,
       sourceID: sourceID
     )
+    versions = supportedVersions
+  }
 
-    payload = versions.flatMap {
-      version in
-      withUnsafeBytes(of: version.rawValue.bigEndian) { $0.map { $0 } }
+  var payload: [UInt8] {
+    let encoder = ByteArrayEncoder()
+    return versions.flatMap { version in
+      try! encoder.encode(version)
     }
   }
 }

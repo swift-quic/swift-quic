@@ -14,15 +14,12 @@ struct Version: RawRepresentable {
     rawValue == 0
   }
 
-  func isForcedNegotiation() -> Bool {
+  func isReserved() -> Bool {
     rawValue & 0x0f0f0f0f == 0x0a0a0a0a
-  }
-
-  func isReservedForFutureUse() -> Bool {
-    rawValue & 0xffff0000 != 0
   }
 }
 
-extension Version: Sendable, Hashable {}
+extension Version: Sendable, Hashable, Codable {}
 
-extension Version: Codable {}
+let currentVersion: Version = .version1
+let supportedVersions: [Version] = [.version1]

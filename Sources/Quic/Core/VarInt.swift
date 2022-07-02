@@ -1,47 +1,19 @@
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
-enum VarInt {
-  case length1(UInt8)
-  case length2(UInt16)
-  case length4(UInt32)
-  case length8(UInt64)
+struct VarInt: RawRepresentable {
+  typealias RawValue = UInt64
+  static let max: RawValue = 0x3FFFFFFFFFFFFFFF
 
-  static let max1: UInt8 = 0x3F
-  static let max2: UInt16 = 0x3FFF
-  static let max4: UInt32 = 0x3FFFFFFF
-  static let max8: UInt64 = 0x3FFFFFFFFFFFFFFF
+  private let data: RawValue
 
-  init(rawValue: UInt8) {
-    if rawValue <= VarInt.max1 {
-      self = .length1(rawValue)
-    } else {
-      self = .length2(UInt16(rawValue))
-    }
-  }
-
-  init(rawValue: UInt16) {
-    if rawValue <= VarInt.max2 {
-      self = .length2(rawValue)
-    } else {
-      self = .length4(UInt32(rawValue))
-    }
-  }
-
-  init(rawValue: UInt32) {
-    if rawValue <= VarInt.max4 {
-      self = .length4(rawValue)
-    } else {
-      self = .length8(UInt64(rawValue))
-    }
-  }
-
-  init?(rawValue: UInt64) {
-    guard rawValue <= VarInt.max8 else {
+  public var rawValue: RawValue { data }
+  init?(rawValue: RawValue) {
+    guard rawValue <= VarInt.max else {
       return nil
     }
-    self = .length8(rawValue)
+    data = rawValue
   }
 }
 
-extension VarInt: Codable {}
+extension VarInt: Sendable, Hashable, Codable {}

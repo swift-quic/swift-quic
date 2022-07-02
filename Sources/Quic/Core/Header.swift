@@ -2,7 +2,7 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 protocol Header: Sendable, Hashable, Codable {
-  var form: HeaderForm { get }
+  var firstByte: FirstByte { get }
 }
 
 protocol LongHeader: Header {
@@ -15,9 +15,4 @@ protocol LongHeader: Header {
 
 protocol ShortHeader: Header {
   var destinationID: ConnectionID { get }
-}
-
-extension Header {
-  func isLong() -> Bool { form.isLong() }
-  func isShort() -> Bool { form.isShort() }
 }

@@ -1,31 +1,8 @@
-//
-//  Server.swift
-//
-//
-//  Created by Kenneth Laskoski on 04/06/22.
-//
+//  Copyright Kenneth Laskoski. All Rights Reserved.
+//  SPDX-License-Identifier: Apache-2.0
 
-import Socket
+public protocol Server: Endpoint {
+  static func bootstrap() async throws -> Self
 
-public struct Server {
-  private let socket: Socket
-  public init() async throws {
-    let address = IPv4SocketAddress(address: .any, port: 8888)
-    socket = try await Socket(
-        IPv4Protocol.tcp,
-        bind: address
-    )
-    try socket.fileDescriptor.listen(backlog: 10)
-  }
-
-  public static func bootstrap() async throws -> Server {
-    try await Server()
-  }
-
-  public func accept() async throws -> Connection {
-    let newConnection = await Socket(
-        fileDescriptor: try await socket.fileDescriptor.accept()
-    )
-    return Connection(socket: newConnection)
-  }
+  func accept() async throws -> Connection
 }

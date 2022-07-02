@@ -12,13 +12,15 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(url: "https://github.com/PureSwift/Socket.git", from: "0.0.0")
+    .package(url: "https://github.com/kennethlaskoski/ByteArrayCodable.git", from: "0.1.0"),
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0"),
   ],
   targets: [
     .target(
       name: "Quic",
       dependencies: [
-        .product(name: "Socket", package: "Socket")
+        .product(name: "ByteArrayCodable", package: "ByteArrayCodable"),
+        .product(name: "NIO", package: "swift-nio"),
       ]
     ),
     .testTarget(
