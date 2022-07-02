@@ -12,6 +12,19 @@ enum PacketType {
   case notQuic
   case short
   case long(LongPacketType)
+
+  init(from byte: FirstByte) {
+    guard byte.contains(.quic) else {
+      self = .notQuic
+      return
+    }
+    guard byte.contains(.long) else {
+      self = .short
+      return
+    }
+    let longType = LongPacketType(rawValue: byte)
+    self = .long(longType ?? .initial)
+  }
 }
 
 extension PacketType: CustomStringConvertible {
@@ -20,13 +33,13 @@ extension PacketType: CustomStringConvertible {
     case .notQuic:
       return "Not quic"
     case .short:
-      return "Short"
+      return "1-RTT"
     case .long(let longPacketType):
       switch longPacketType {
       case .initial:
-        return "Long initial"
+        return "Initial"
       case .zeroRTT:
-        return "Long 0-RTT"
+        return "0-RTT"
       case .handshake:
         return "Handshake"
       case .retry:

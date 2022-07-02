@@ -4,7 +4,7 @@
 import ByteArrayCodable
 
 struct VersionNegotiationHeader: Header {
-  var firstByte: FirstByte { .long }
+  var firstByte: FirstByte { .initial }
   var version: Version { Version.negotiation }
 
   var destinationIDLength: UInt8 { destinationID.length }
