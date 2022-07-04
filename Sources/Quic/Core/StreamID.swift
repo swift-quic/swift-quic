@@ -3,8 +3,8 @@
 
 struct StreamID: RawRepresentable {
   typealias RawValue = VarInt
-  let data: RawValue
 
+  private let data: RawValue
   var rawValue: RawValue { data }
   init(rawValue: RawValue) {
     data = rawValue

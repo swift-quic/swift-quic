@@ -2,24 +2,41 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 struct Version: RawRepresentable {
-  let rawValue: UInt32
-  init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
+  typealias RawValue = UInt32
 
-  static let negotiation = Version(rawValue: 0)
-  static let version1 = Version(rawValue: 1)
-
-  func isNegotiation() -> Bool {
-    rawValue == 0
+  private let data: RawValue
+  var rawValue: RawValue { data }
+  init(rawValue: RawValue) {
+    data = rawValue
   }
+}
 
-  func isReserved() -> Bool {
-    rawValue & 0x0f0f0f0f == 0x0a0a0a0a
-  }
+extension Version {
+  static let negotiation: Version = 0
 }
 
 extension Version: Sendable, Hashable, Codable {}
 
-let currentVersion: Version = .version1
-let supportedVersions: [Version] = [.version1]
+extension Version: ExpressibleByIntegerLiteral {
+  init(integerLiteral value: RawValue) {
+    self.init(rawValue: value)
+  }
+}
+
+fileprivate extension Version {
+  func isNegotiation() -> Bool {
+    data == 0
+  }
+
+  func isReserved() -> Bool {
+    data & 0x0f0f0f0f == 0x0a0a0a0a
+  }
+}
+
+func isNegotiation(version: Version) -> Bool {
+  version.isNegotiation()
+}
+
+func isReserved(version: Version) -> Bool {
+  version.isReserved()
+}
