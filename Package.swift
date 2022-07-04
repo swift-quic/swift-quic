@@ -20,7 +20,8 @@ let package = Package(
       name: "Quic",
       dependencies: [
         .product(name: "ByteArrayCodable", package: "ByteArrayCodable"),
-        .product(name: "NIO", package: "swift-nio"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOPosix", package: "swift-nio"),
       ]
     ),
     .testTarget(

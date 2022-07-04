@@ -7,18 +7,29 @@ struct ConnectionID: RawRepresentable {
 
   private let data: RawValue
   var rawValue: RawValue { data }
-  init(rawValue: RawValue) {
-    guard !rawValue.isEmpty else {
-      data = []
-      return
+  init?(rawValue: RawValue) {
+    guard rawValue.count <= ConnectionID.maxLength else {
+      return nil
     }
-
-    let slice = rawValue[..<ConnectionID.maxLength]
-    data = RawValue(slice)
+    data = rawValue
   }
 
   static var maxLength: Int { Int(Length.max) }
   var length: Length { Length(data.count) }
 }
 
+extension ConnectionID {
+  init(truncating rawValue: RawValue) {
+    let upperBound = min(ConnectionID.maxLength, rawValue.count)
+    let slice = RawValue(rawValue[..<upperBound])
+    self.init(rawValue: slice)!
+  }
+}
+
 extension ConnectionID: Sendable, Hashable, Codable {}
+
+extension ConnectionID: ExpressibleByArrayLiteral {
+  init(arrayLiteral elements: RawValue.Element...) {
+    self.init(truncating: elements)
+  }
+}

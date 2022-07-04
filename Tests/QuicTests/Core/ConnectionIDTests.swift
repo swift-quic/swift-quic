@@ -6,22 +6,35 @@ import XCTest
 
 final class ConnectionIDTests: XCTestCase {
   func testEmpty() throws {
-    XCTAssertEqual(ConnectionID(rawValue: []).length, 0)
+    let connectionID: ConnectionID = []
+    XCTAssertEqual(connectionID.length, 0)
+    XCTAssertEqual(connectionID.rawValue, [])
+  }
+
+  func testNonEmpty() throws {
+    let connectionID: ConnectionID = [0, 1, 2, 3]
+    XCTAssertEqual(connectionID.length, 4)
+    XCTAssertEqual(connectionID.rawValue, [0, 1, 2, 3])
   }
 
   func testMaxLength() throws {
     XCTAssertEqual(ConnectionID.maxLength, Int(ConnectionID.Length.max))
   }
 
-  func testInit() throws {
+  func testInitWithMaxLength() throws {
     let data: [UInt8] = [UInt8](repeating: 0, count: ConnectionID.maxLength)
-    XCTAssertEqual(ConnectionID(rawValue: data).length, ConnectionID.Length(ConnectionID.maxLength))
-    XCTAssertEqual(ConnectionID(rawValue: data).rawValue, data)
+    let connectionID = ConnectionID(truncating: data)
+    XCTAssertEqual(connectionID.length, ConnectionID.Length(ConnectionID.maxLength))
+    XCTAssertEqual(connectionID.rawValue, data)
   }
 
   func testOverflow() throws {
     let data: [UInt8] = [UInt8](repeating: 0, count: ConnectionID.maxLength + 1)
-    XCTAssertEqual(data.count, ConnectionID.maxLength + 1)
-    XCTAssertEqual(ConnectionID(rawValue: data).length, ConnectionID.Length(ConnectionID.maxLength))
+    XCTAssertTrue(data.count > ConnectionID.maxLength)
+    XCTAssertNil(ConnectionID(rawValue: data))
+
+    let connectionID = ConnectionID(truncating: data)
+    XCTAssertEqual(connectionID.length, ConnectionID.Length(ConnectionID.maxLength))
+    XCTAssertEqual(connectionID.rawValue, data.dropLast())
   }
 }
