@@ -33,22 +33,3 @@ enum PacketType {
     self = .initial
   }
 }
-
-extension PacketType: CustomStringConvertible {
-  var description: String {
-    switch self {
-    case .notQuic:
-      return "Not quic"
-    case .short:
-      return "1-RTT"
-    case .initial:
-      return "Initial"
-    case .zeroRTT:
-      return "0-RTT"
-    case .handshake:
-      return "Handshake"
-    case .retry:
-      return "Retry"
-    }
-  }
-}
