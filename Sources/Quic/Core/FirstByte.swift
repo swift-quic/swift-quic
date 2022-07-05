@@ -27,8 +27,8 @@ struct FirstByte: OptionSet {
   static let handshake: FirstByte = [.long, .bit5]
   static let retry: FirstByte = [.long, .bit5, .bit4]
 
-  static let spin: FirstByte = [.quic, .bit5]
-  static let keyPhase: FirstByte = [.quic, .bit2]
+//  static let spin: FirstByte = [.quic, .bit5]
+//  static let keyPhase: FirstByte = [.quic, .bit2]
 }
 
 extension FirstByte: Sendable, Hashable, Codable {}

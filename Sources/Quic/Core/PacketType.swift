@@ -3,33 +3,33 @@
 
 enum PacketType {
   case notQuic
-  case short
+  case oneRTT
   case initial
   case zeroRTT
   case handshake
   case retry
+}
 
-  init(from byte: FirstByte) {
-    guard byte.contains(.quic) else {
-      self = .notQuic
-      return
-    }
-    guard byte.contains(.long) else {
-      self = .short
-      return
-    }
-    if byte.contains(.retry) {
-      self = .retry
-      return
-    }
-    if byte.contains(.handshake) {
-      self = .handshake
-      return
-    }
-    if byte.contains(.zeroRTT) {
-      self = .zeroRTT
-      return
-    }
-    self = .initial
+func packetType(from byte: FirstByte) -> PacketType {
+  guard byte.contains(.quic) else {
+    return .notQuic
   }
+
+  guard byte.contains(.long) else {
+    return .oneRTT
+  }
+
+  if byte.contains(.retry) {
+    return .retry
+  }
+
+  if byte.contains(.handshake) {
+    return .handshake
+  }
+
+  if byte.contains(.zeroRTT) {
+    return .zeroRTT
+  }
+
+  return .initial
 }

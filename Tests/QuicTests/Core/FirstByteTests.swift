@@ -6,14 +6,16 @@ import XCTest
 
 final class FirstByteTests: XCTestCase {
   func testFirstByte() throws {
-    let byte: FirstByte = 0b1111_0000
-    XCTAssertTrue(byte.contains(.quic))
-    XCTAssertTrue(byte.contains(.long))
-    XCTAssertTrue(byte.contains(.initial))
-    XCTAssertTrue(byte.contains(.zeroRTT))
-    XCTAssertTrue(byte.contains(.handshake))
-    XCTAssertTrue(byte.contains(.retry))
-    XCTAssertTrue(byte.contains(.spin))
-    XCTAssertFalse(byte.contains(.keyPhase))
+    for byte in UInt8.min...UInt8.max {
+      let firstByte = FirstByte(rawValue: byte)
+      XCTAssertFalse(firstByte.contains(.long) && !firstByte.contains(.quic))
+
+      XCTAssertFalse(firstByte.contains(.initial) && !firstByte.contains(.long))
+      XCTAssertFalse(firstByte.contains(.zeroRTT) && !firstByte.contains(.long))
+      XCTAssertFalse(firstByte.contains(.handshake) && !firstByte.contains(.long))
+      XCTAssertFalse(firstByte.contains(.retry) && !firstByte.contains(.long))
+
+      XCTAssertFalse(firstByte == .zeroRTT && firstByte == .handshake)
+    }
   }
 }
