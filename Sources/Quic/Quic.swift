@@ -26,3 +26,5 @@ func isKnown(version: Version) -> Bool {
 func isSupported(version: Version) -> Bool {
   supportedVersions.contains(version)
 }
+
+let minDatagramSize = 1200
