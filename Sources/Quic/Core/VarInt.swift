@@ -33,6 +33,7 @@ extension VarInt: Codable {
       let value = UInt32(exactly: data)! | 0x8000_0000
       try container.encode(value)
     default:
+      precondition(data < VarInt.upperBound)
       let value = data | 0xc000_0000_0000_0000
       try container.encode(value)
     }
@@ -42,11 +43,11 @@ extension VarInt: Codable {
     let firstByte = try UInt8(from: decoder)
 
     let prefix = firstByte >> 6
-    var length = 1 << prefix
+    var length = (1 << prefix) - 1
 
     var value = UInt64(firstByte) & 0x3f
 
-    while length > 1 {
+    while length > 0 {
       value = (value << 8) + UInt64(try UInt8(from: decoder))
       length -= 1
     }
