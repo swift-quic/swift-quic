@@ -14,8 +14,8 @@ enum StreamType: UInt8 {
 }
 
 extension StreamType {
-  var origin: Role {
-    Role(rawValue: self.rawValue & 0b01)!
+  var origin: EndpointRole {
+    EndpointRole(rawValue: self.rawValue & 0b01)!
   }
 
   var direction: Direction {

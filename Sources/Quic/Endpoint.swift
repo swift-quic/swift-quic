@@ -27,5 +27,5 @@
 extension Location: Sendable, Comparable, Hashable {}
 
 protocol Endpoint {
-  var role: Role { get }
+  var role: EndpointRole { get }
 }

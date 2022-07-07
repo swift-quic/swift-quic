@@ -5,7 +5,7 @@ import Foundation
 
 protocol Stream {
   var type: StreamType { get }
-  var origin: Role { get }
+  var origin: EndpointRole { get }
   var direction: Direction { get }
 
   func receive() async throws -> Data
@@ -13,6 +13,6 @@ protocol Stream {
 }
 
 extension Stream {
-  var origin: Role { type.origin }
+  var origin: EndpointRole { type.origin }
   var direction: Direction { type.direction }
 }
