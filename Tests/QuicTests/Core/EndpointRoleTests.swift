@@ -5,7 +5,7 @@ import XCTest
 @testable import Quic
 
 final class EndpointRoleTests: XCTestCase {
-  func testDefaultInit() throws {
+  func testInit() throws {
     XCTAssertEqual(EndpointRole(rawValue: 0), .client)
     XCTAssertEqual(EndpointRole(rawValue: 1), .server)
 
@@ -13,11 +13,11 @@ final class EndpointRoleTests: XCTestCase {
     XCTAssertNil(EndpointRole(rawValue: UInt8.max))
   }
 
-  func testTruncatingInit() throws {
-    XCTAssertEqual(EndpointRole(truncating: 0), .client)
-    XCTAssertEqual(EndpointRole(truncating: 1), .server)
+  func testTruncating() throws {
+    XCTAssertEqual(EndpointRole(truncatingIfNeeded: 0), .client)
+    XCTAssertEqual(EndpointRole(truncatingIfNeeded: 1), .server)
 
-    XCTAssertEqual(EndpointRole(truncating: 2), .client)
-    XCTAssertEqual(EndpointRole(truncating: UInt8.max), .server)
+    XCTAssertEqual(EndpointRole(truncatingIfNeeded: 2), .client)
+    XCTAssertEqual(EndpointRole(truncatingIfNeeded: UInt8.max), .server)
   }
 }

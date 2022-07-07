@@ -7,8 +7,8 @@ enum EndpointRole: UInt8 {
 }
 
 extension EndpointRole {
-  init(truncating rawValue: RawValue) {
-    self.init(rawValue: rawValue & 1)!
+  init(truncatingIfNeeded source: RawValue) {
+    self.init(rawValue: source & 1)!
   }
 }
 

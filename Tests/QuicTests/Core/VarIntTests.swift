@@ -8,15 +8,23 @@ import ByteArrayCodable
 
 final class VarIntTests: XCTestCase {
   func testMax() throws {
-    XCTAssertNotNil(VarInt(rawValue: VarInt.max))
-    XCTAssertEqual(VarInt(rawValue: VarInt.max)?.rawValue, VarInt.max)
+    XCTAssertNotNil(VarInt(rawValue: VarInt.maxRawValue))
+    XCTAssertEqual(VarInt(rawValue: VarInt.maxRawValue), VarInt.max)
   }
 
   func testUpperBound() throws {
-    XCTAssertEqual(VarInt.upperBound, VarInt.max + 1)
+    XCTAssertEqual(VarInt.upperBound, VarInt.maxRawValue + 1)
+
     XCTAssertNil(VarInt(rawValue: VarInt.upperBound))
     XCTAssertNil(VarInt(rawValue: VarInt.upperBound + 1))
     XCTAssertNil(VarInt(rawValue: UInt64.max))
+  }
+
+  func testTruncating() throws {
+    XCTAssertEqual(VarInt(truncatingIfNeeded: VarInt.maxRawValue), VarInt.max)
+    XCTAssertEqual(VarInt(truncatingIfNeeded: VarInt.upperBound), VarInt.max)
+    XCTAssertEqual(VarInt(truncatingIfNeeded: VarInt.upperBound + 1), VarInt.max)
+    XCTAssertEqual(VarInt(truncatingIfNeeded: UInt64.max), VarInt.max)
   }
 
   func testEncoding() throws {
@@ -51,7 +59,7 @@ final class VarIntTests: XCTestCase {
     bytes = try encoder.encode(minUInt64)
     XCTAssertEqual(bytes, [0xc0, 0, 0, 0, 0x40, 0, 0, 0])
 
-    let maxUInt64 = VarInt(rawValue: VarInt.max)!
+    let maxUInt64 = VarInt(rawValue: VarInt.maxRawValue)!
     bytes = try encoder.encode(maxUInt64)
     XCTAssertEqual(bytes, [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
   }
@@ -90,6 +98,6 @@ final class VarIntTests: XCTestCase {
     XCTAssertEqual(minUInt64, VarInt(rawValue: 0x4000_0000)!)
 
     let maxUInt64 = try VarInt(from: decoder)
-    XCTAssertEqual(maxUInt64, VarInt(rawValue: VarInt.max)!)
+    XCTAssertEqual(maxUInt64, VarInt(rawValue: VarInt.maxRawValue)!)
   }
 }

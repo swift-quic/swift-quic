@@ -19,9 +19,9 @@ struct ConnectionID: RawRepresentable {
 }
 
 extension ConnectionID {
-  init(truncating rawValue: RawValue) {
-    let upperBound = min(ConnectionID.maxLength, rawValue.count)
-    let slice = RawValue(rawValue[..<upperBound])
+  init(truncatingIfNeeded source: RawValue) {
+    let upperBound = min(ConnectionID.maxLength, source.count)
+    let slice = RawValue(source[..<upperBound])
     self.init(rawValue: slice)!
   }
 }
@@ -30,6 +30,6 @@ extension ConnectionID: Sendable, Hashable, Codable {}
 
 extension ConnectionID: ExpressibleByArrayLiteral {
   init(arrayLiteral elements: RawValue.Element...) {
-    self.init(truncating: elements)
+    self.init(truncatingIfNeeded: elements)
   }
 }

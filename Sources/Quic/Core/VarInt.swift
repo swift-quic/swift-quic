@@ -14,7 +14,18 @@ struct VarInt: RawRepresentable {
   }
 
   static let upperBound: RawValue = 0x4000_0000_0000_0000
-  static var max: RawValue { upperBound - 1 }
+  static var maxRawValue: RawValue { upperBound - 1 }
+  static var max: VarInt { VarInt(rawValue: maxRawValue)! }
+}
+
+extension VarInt {
+  init(truncatingIfNeeded source: RawValue) {
+    guard source < VarInt.upperBound else {
+      self = VarInt.max
+      return
+    }
+    self.init(rawValue: source)!
+  }
 }
 
 extension VarInt: Sendable, Hashable {}
