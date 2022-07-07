@@ -1,6 +1,9 @@
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
+import Foundation
+import ByteArrayCodable
+
 struct VarInt: RawRepresentable {
   typealias RawValue = UInt64
 
@@ -13,22 +16,44 @@ struct VarInt: RawRepresentable {
     data = rawValue
   }
 
-  static let upperBound: RawValue = 0x4000_0000_0000_0000
+  static let upperBound: RawValue = 1 << 62
   static var maxRawValue: RawValue { upperBound - 1 }
   static var max: VarInt { VarInt(rawValue: maxRawValue)! }
 }
 
 extension VarInt {
-  init(truncatingIfNeeded source: RawValue) {
-    guard source < VarInt.upperBound else {
-      self = VarInt.max
+  init<S: Sequence>(with bytes: S) where S.Element == UInt8 {
+    guard let first = bytes.first(where: { _ in true }) else {
+      self.init(rawValue: 0)!
       return
     }
-    self.init(rawValue: source)!
+
+    let prefix = first >> 6
+    let length = 1 << prefix
+
+    let remaining = bytes.dropFirst().prefix(length - 1)
+    let rawValue = remaining.reduce(UInt64(first & 0x3f)) {
+      $0 << 8 + UInt64($1)
+    }
+
+    self.init(rawValue: rawValue)!
   }
 }
 
 extension VarInt: Sendable, Hashable {}
+
+extension VarInt {
+  var bytes: [UInt8] {
+    let encoder = ByteArrayEncoder()
+    return try! encoder.encode(self)
+  }
+}
+
+extension VarInt: ContiguousBytes {
+  func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    try bytes.withUnsafeBytes(body)
+  }
+}
 
 extension VarInt: Codable {
   func encode(to encoder: Encoder) throws {
@@ -51,17 +76,17 @@ extension VarInt: Codable {
   }
 
   init(from decoder: Decoder) throws {
-    let firstByte = try UInt8(from: decoder)
+    let container = try decoder.singleValueContainer()
+    let firstByte = try container.decode(UInt8.self)
 
     let prefix = firstByte >> 6
     var length = (1 << prefix) - 1
 
-    var value = UInt64(firstByte) & 0x3f
-
+    var bytes = [firstByte]
     while length > 0 {
-      value = (value << 8) + UInt64(try UInt8(from: decoder))
+      bytes.append(try UInt8(from: decoder))
       length -= 1
     }
-    self.init(rawValue: value)!
+    self.init(with: bytes)
   }
 }

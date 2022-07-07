@@ -31,9 +31,19 @@ final class ConnectionIDTests: XCTestCase {
   }
 
   func testNonEmptyLiteral() throws {
-    let connectionID: ConnectionID = [0]
-    XCTAssertEqual(connectionID.length, 1)
-    XCTAssertEqual(connectionID.rawValue, [0])
+    let connectionID: ConnectionID = [0, 1, UInt8.max]
+    XCTAssertEqual(connectionID.length, 3)
+    XCTAssertEqual(connectionID.rawValue, [0, 1, UInt8.max])
   }
 
+  func testContiguousBytes() throws {
+    let connectionID: ConnectionID = [0, 1, UInt8.max]
+    connectionID.withUnsafeBytes { pointer in
+      XCTAssertEqual(pointer.count, 3)
+      let bytePointer = pointer.baseAddress!.bindMemory(to: UInt8.self, capacity: 3)
+      XCTAssertEqual(bytePointer.pointee, 0)
+      XCTAssertEqual(bytePointer.successor().pointee, 1)
+      XCTAssertEqual(bytePointer.advanced(by: 2).pointee, UInt8.max)
+    }
+  }
 }

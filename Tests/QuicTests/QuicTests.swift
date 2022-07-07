@@ -30,4 +30,8 @@ final class QuicTests: XCTestCase {
     XCTAssertFalse(isSupported(version: .versionDraft28))
     XCTAssertFalse(isSupported(version: .versionDraft29))
   }
+
+  func testMinDatagramSize() throws {
+    XCTAssertEqual(minDatagramSize, 1200)
+  }
 }
