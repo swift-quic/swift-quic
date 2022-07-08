@@ -18,6 +18,9 @@ final class EndpointRoleTests: XCTestCase {
     XCTAssertEqual(EndpointRole(truncatingIfNeeded: 1), .server)
 
     XCTAssertEqual(EndpointRole(truncatingIfNeeded: 2), .client)
+    XCTAssertEqual(EndpointRole(truncatingIfNeeded: 3), .server)
+
+    XCTAssertEqual(EndpointRole(truncatingIfNeeded: UInt8.max - 1), .client)
     XCTAssertEqual(EndpointRole(truncatingIfNeeded: UInt8.max), .server)
   }
 }

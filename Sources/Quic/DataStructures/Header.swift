@@ -7,9 +7,9 @@ protocol Header: Sendable, Hashable, Codable {
 
 protocol LongHeader: Header {
   var version: Version { get }
-  var destinationIDLength: ConnectionID.Length { get }
+  var destinationIDLength: UInt8 { get }
   var destinationID: ConnectionID { get }
-  var sourceIDLength: ConnectionID.Length { get }
+  var sourceIDLength: UInt8 { get }
   var sourceID: ConnectionID { get }
 }
 

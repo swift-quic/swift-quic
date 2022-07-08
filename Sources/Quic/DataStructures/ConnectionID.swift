@@ -5,26 +5,19 @@ import Foundation
 
 struct ConnectionID: RawRepresentable {
   typealias RawValue = [UInt8]
-  typealias Length = UInt8
 
   private let data: RawValue
   var rawValue: RawValue { data }
-  init?(rawValue: RawValue) {
-    guard rawValue.count <= ConnectionID.maxLength else {
-      return nil
-    }
+  init(rawValue: RawValue) {
     data = rawValue
   }
 
-  static var maxLength: Int { Int(Length.max) }
-  var length: Length { Length(data.count) }
+  var length: Int { data.count }
 }
 
 extension ConnectionID {
-  init(truncatingIfNeeded source: RawValue) {
-    let upperBound = min(ConnectionID.maxLength, source.count)
-    let slice = RawValue(source[..<upperBound])
-    self.init(rawValue: slice)!
+  init<S: Sequence>(with bytes: S) where S.Element == RawValue.Element {
+    self.init(rawValue: RawValue(bytes))
   }
 }
 
@@ -32,7 +25,7 @@ extension ConnectionID: Sendable, Hashable, Codable {}
 
 extension ConnectionID: ExpressibleByArrayLiteral {
   init(arrayLiteral elements: RawValue.Element...) {
-    self.init(truncatingIfNeeded: elements)
+    self.init(rawValue: elements)
   }
 }
 

@@ -21,22 +21,30 @@ struct VarInt: RawRepresentable {
   static var max: VarInt { VarInt(rawValue: maxRawValue)! }
 }
 
+extension VarInt: ExpressibleByIntegerLiteral {
+  init(integerLiteral value: RawValue) {
+    precondition(value < VarInt.upperBound)
+    self.init(rawValue: value)!
+  }
+}
+
 extension VarInt {
   init<S: Sequence>(with bytes: S) where S.Element == UInt8 {
-    guard let first = bytes.first(where: { _ in true }) else {
-      self.init(rawValue: 0)!
+    guard let firstByte = bytes.first(where: { _ in true }) else {
+      self = 0
       return
     }
 
-    let prefix = first >> 6
+    let prefix = firstByte >> 6
     let length = 1 << prefix
 
     let remaining = bytes.dropFirst().prefix(length - 1)
-    let rawValue = remaining.reduce(UInt64(first & 0x3f)) {
+    let value = remaining.reduce(UInt64(firstByte & 0x3f)) {
       $0 << 8 + UInt64($1)
     }
 
-    self.init(rawValue: rawValue)!
+    precondition(value < VarInt.upperBound)
+    self.init(rawValue: value)!
   }
 }
 

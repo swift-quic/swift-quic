@@ -9,6 +9,10 @@ struct StreamID: RawRepresentable {
   init(rawValue: RawValue) {
     data = rawValue
   }
+
+  var encodedType: StreamType {
+    StreamType(truncatingIfNeeded: StreamType.RawValue(self.rawValue.rawValue))
+  }
 }
 
 extension StreamID: Sendable, Hashable, Codable {}

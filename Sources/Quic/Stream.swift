@@ -4,15 +4,17 @@
 import Foundation
 
 protocol Stream {
+  var id: StreamID { get }
   var type: StreamType { get }
   var origin: EndpointRole { get }
-  var direction: Direction { get }
+  var flowDirection: StreamFlowDirection { get }
 
   func receive() async throws -> Data
   func send(_ data: Data) async throws
 }
 
 extension Stream {
+  var type: StreamType { id.encodedType }
   var origin: EndpointRole { type.origin }
-  var direction: Direction { type.direction }
+  var flowDirection: StreamFlowDirection { type.flowDirection }
 }

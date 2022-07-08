@@ -30,3 +30,4 @@ func isSupported(version: Version) -> Bool {
 }
 
 let minDatagramSize = { 1200 }()
+let maxConnectionIDLength = 20

@@ -7,10 +7,10 @@ struct VersionNegotiationHeader: Header {
   var firstByte: FirstByte { .initial }
   var version: Version { Version.negotiation }
 
-  var destinationIDLength: UInt8 { destinationID.length }
+  var destinationIDLength: UInt8 { UInt8(truncatingIfNeeded: destinationID.length) }
   let destinationID: ConnectionID
 
-  var sourceIDLength: UInt8 { sourceID.length }
+  var sourceIDLength: UInt8 { UInt8(truncatingIfNeeded: sourceID.length) }
   let sourceID: ConnectionID
 }
 

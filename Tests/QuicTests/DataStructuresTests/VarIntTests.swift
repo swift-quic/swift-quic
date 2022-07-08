@@ -20,6 +20,14 @@ final class VarIntTests: XCTestCase {
     XCTAssertNil(VarInt(rawValue: UInt64.max))
   }
 
+  func testLiteral() throws {
+    let zero: VarInt = 0
+    XCTAssertEqual(zero, 0)
+
+    let max: VarInt = 0x3fff_ffff_ffff_ffff
+    XCTAssertEqual(max, VarInt.max)
+  }
+
   func testBytes() throws {
     var bytes: [UInt8] = []
     bytes.append(contentsOf: VarInt(rawValue: 0)!.bytes)
