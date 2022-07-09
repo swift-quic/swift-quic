@@ -22,12 +22,12 @@ extension ConnectionID: ExpressibleByArrayLiteral {
 }
 
 extension ConnectionID: QuicType {
-  init<S>(with bytes: S) where S : Sequence, S.Element == UInt8 {
+  init<S>(with bytes: S) where S: Sequence, S.Element == UInt8 {
     self.init(rawValue: RawValue(bytes))
   }
 
-  var bytes: [UInt8] {
-    rawValue
+  func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    try rawValue.withUnsafeBytes(body)
   }
 }
 
