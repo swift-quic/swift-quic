@@ -6,10 +6,6 @@ enum EndpointRole: UInt8 {
   case server = 1
 }
 
-extension EndpointRole {
-  init(truncatingIfNeeded source: RawValue) {
-    self.init(rawValue: source & 1)!
-  }
+extension EndpointRole: ByteFragment {
+  static let mask: UInt8 = 1
 }
-
-extension EndpointRole: Sendable, Hashable {}

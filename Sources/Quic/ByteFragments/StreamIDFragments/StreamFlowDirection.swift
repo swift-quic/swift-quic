@@ -6,10 +6,6 @@ enum StreamFlowDirection: UInt8 {
   case uniDirectional = 0b10
 }
 
-extension StreamFlowDirection {
-  init(truncatingIfNeeded source: RawValue) {
-    self.init(rawValue: source & 0b10)!
-  }
+extension StreamFlowDirection: ByteFragment {
+  static let mask: UInt8 = 0b10
 }
-
-extension StreamFlowDirection: Sendable, Hashable {}

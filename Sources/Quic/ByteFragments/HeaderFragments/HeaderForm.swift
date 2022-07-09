@@ -6,10 +6,6 @@ enum HeaderForm: UInt8 {
   case long = 0b1000_0000
 }
 
-extension HeaderForm {
-  init(truncatingIfNeeded source: RawValue) {
-    self.init(rawValue: source & 0b1000_0000)!
-  }
+extension HeaderForm: ByteFragment {
+  static let mask: UInt8 = 0b1000_0000
 }
-
-extension HeaderForm: Sendable, Hashable {}

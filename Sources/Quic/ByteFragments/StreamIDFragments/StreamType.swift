@@ -8,20 +8,16 @@ enum StreamType: UInt8 {
   case serverUni = 0b11
 }
 
+extension StreamType: ByteFragment {
+  static let mask: UInt8 = 0b11
+}
+
 extension StreamType {
   var origin: EndpointRole {
-    EndpointRole(rawValue: self.rawValue & 0b01)!
+    EndpointRole(truncatingIfNeeded: rawValue)
   }
 
   var flowDirection: StreamFlowDirection {
-    StreamFlowDirection(rawValue: (self.rawValue & 0b10))!
+    StreamFlowDirection(truncatingIfNeeded: rawValue)
   }
 }
-
-extension StreamType {
-  init(truncatingIfNeeded source: RawValue) {
-    self.init(rawValue: source & 0b11)!
-  }
-}
-
-extension StreamType: Sendable, Hashable {}

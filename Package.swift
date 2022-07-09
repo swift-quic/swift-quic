@@ -4,7 +4,10 @@ import PackageDescription
 
 let package = Package(
   name: "swift-quic",
-  platforms: [.macOS(.v10_15)],
+  platforms: [
+    .macOS(.v10_15),
+    .iOS(.v13),
+  ],
   products: [
     .library(
       name: "Quic",
