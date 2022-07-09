@@ -13,13 +13,6 @@ final class ConnectionIDTests: XCTestCase {
     XCTAssertEqual(connectionID.rawValue, data)
   }
 
-  func testInitWithSequence() throws {
-    let data: [UInt8] = [0, 1, UInt8.max - 1, UInt8.max]
-    data.withUnsafeBytes { pointer in
-      XCTAssertEqual(ConnectionID(with: pointer).rawValue, data)
-    }
-  }
-
   func testEmptyLiteral() throws {
     let connectionID: ConnectionID = []
     XCTAssertEqual(connectionID.length, 0)
@@ -30,6 +23,13 @@ final class ConnectionIDTests: XCTestCase {
     let connectionID: ConnectionID = [0, 1, UInt8.max - 1, UInt8.max]
     XCTAssertEqual(connectionID.length, 4)
     XCTAssertEqual(connectionID.rawValue, [0, 1, UInt8.max - 1, UInt8.max])
+  }
+
+  func testInitWithBytes() throws {
+    let data: [UInt8] = [0, 1, UInt8.max - 1, UInt8.max]
+    data.withUnsafeBytes { pointer in
+      XCTAssertEqual(ConnectionID(with: pointer).rawValue, data)
+    }
   }
 
   func testContiguousBytes() throws {

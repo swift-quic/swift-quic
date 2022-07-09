@@ -15,13 +15,24 @@ extension Version {
   static let negotiation: Version = 0
 }
 
-extension Version: Sendable, Hashable, Codable {}
-
 extension Version: ExpressibleByIntegerLiteral {
   init(integerLiteral value: RawValue) {
     self.init(rawValue: value)
   }
 }
+
+extension Version: QuicType {
+  init(with bytes: UnsafeBufferPointer<UInt8>) {
+    let rawPointer = UnsafeRawBufferPointer(bytes)
+    self.init(rawValue: RawValue(bigEndian: rawPointer.load(as: RawValue.self)))
+  }
+
+  func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    try Swift.withUnsafeBytes(of: rawValue.bigEndian, body)
+  }
+}
+
+extension Version: Codable {}
 
 fileprivate extension Version {
   func isNegotiation() -> Bool {
