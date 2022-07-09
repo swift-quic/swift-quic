@@ -14,7 +14,7 @@ extension StreamType {
   }
 
   var flowDirection: StreamFlowDirection {
-    StreamFlowDirection(rawValue: (self.rawValue & 0b10) >> 1)!
+    StreamFlowDirection(rawValue: (self.rawValue & 0b10))!
   }
 }
 

@@ -34,4 +34,8 @@ final class QuicTests: XCTestCase {
   func testMinDatagramSize() throws {
     XCTAssertEqual(minDatagramSize, 1200)
   }
+
+  func testMaxConnectionIDLength() throws {
+    XCTAssertEqual(maxConnectionIDLength, 20)
+  }
 }
