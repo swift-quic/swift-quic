@@ -1,8 +1,6 @@
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
-import Foundation
-
 struct ConnectionID: RawRepresentable {
   typealias RawValue = [UInt8]
 

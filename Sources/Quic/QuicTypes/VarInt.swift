@@ -1,7 +1,6 @@
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
-import Foundation
 import ByteArrayCodable
 
 struct VarInt: RawRepresentable {
@@ -28,7 +27,7 @@ extension VarInt: ExpressibleByIntegerLiteral {
   }
 }
 
-extension VarInt {
+extension VarInt: QuicType {
   init<S: Sequence>(with bytes: S) where S.Element == UInt8 {
     guard let firstByte = bytes.first(where: { _ in true }) else {
       self = 0
@@ -46,20 +45,16 @@ extension VarInt {
     precondition(value < VarInt.upperBound)
     self.init(rawValue: value)!
   }
-}
 
-extension VarInt: Sendable, Hashable {}
+  func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    try bytes.withUnsafeBytes(body)
+  }
+}
 
 extension VarInt {
   var bytes: [UInt8] {
     let encoder = ByteArrayEncoder()
     return try! encoder.encode(self)
-  }
-}
-
-extension VarInt: ContiguousBytes {
-  func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
-    try bytes.withUnsafeBytes(body)
   }
 }
 
