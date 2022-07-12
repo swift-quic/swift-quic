@@ -1,17 +1,33 @@
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
-import ByteArrayCodable
-
 struct VarInt: RawRepresentable {
   typealias RawValue = UInt64
 
+  private let buffer: [UInt8]
   private let data: RawValue
   public var rawValue: RawValue { data }
   init?(rawValue: RawValue) {
     guard rawValue < VarInt.upperBound else {
       return nil
     }
+
+    switch rawValue {
+    case ..<0x40:
+      let value = UInt8(exactly: rawValue)!
+      buffer = bytes(of: value)
+    case 0x40..<0x4000:
+      let value = UInt16(exactly: rawValue)! | 0x4000
+      buffer = bytes(of: value)
+    case 0x4000..<0x4000_0000:
+      let value = UInt32(exactly: rawValue)! | 0x8000_0000
+      buffer = bytes(of: value)
+    default:
+      precondition(rawValue < VarInt.upperBound)
+      let value = rawValue | 0xc000_0000_0000_0000
+      buffer = bytes(of: value)
+    }
+
     data = rawValue
   }
 
@@ -42,54 +58,17 @@ extension VarInt: QuicType {
       $0 << 8 + UInt64($1)
     }
 
-    precondition(value < VarInt.upperBound)
-    self.init(rawValue: value)!
+    self.init(integerLiteral: value)
   }
 
   func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
-    try bytes.withUnsafeBytes(body)
+    try buffer.withUnsafeBytes(body)
   }
 }
 
-extension VarInt {
-  var bytes: [UInt8] {
-    let encoder = ByteArrayEncoder()
-    return try! encoder.encode(self)
-  }
+func bytes<T>(of value: T) -> [UInt8]
+where T: FixedWidthInteger {
+  withUnsafeBytes(of: value.bigEndian) { $0.map { $0 } }
 }
 
-extension VarInt: Codable {
-  func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    switch data {
-    case ..<0x40:
-      let value = UInt8(exactly: data)!
-      try container.encode(value)
-    case 0x40..<0x4000:
-      let value = UInt16(exactly: data)! | 0x4000
-      try container.encode(value)
-    case 0x4000..<0x4000_0000:
-      let value = UInt32(exactly: data)! | 0x8000_0000
-      try container.encode(value)
-    default:
-      precondition(data < VarInt.upperBound)
-      let value = data | 0xc000_0000_0000_0000
-      try container.encode(value)
-    }
-  }
-
-  init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    let firstByte = try container.decode(UInt8.self)
-
-    let prefix = firstByte >> 6
-    var length = (1 << prefix) - 1
-
-    var bytes = [firstByte]
-    while length > 0 {
-      bytes.append(try UInt8(from: decoder))
-      length -= 1
-    }
-    self.init(with: bytes)
-  }
-}
+extension VarInt: Codable {}

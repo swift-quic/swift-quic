@@ -1,8 +1,6 @@
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
-import ByteArrayCodable
-
 struct InitialHeader: Header {
   var firstByte: FirstByte { .initial }
   var version: Version { currentVersion }
