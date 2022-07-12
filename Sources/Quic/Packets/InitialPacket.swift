@@ -2,7 +2,7 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 struct InitialHeader: Header {
-  var firstByte: FirstByte { .initial }
+  var firstByte: UInt8 { LongPacketType.initial.rawValue }
   var version: Version { currentVersion }
 
   var destinationIDLength: UInt8 { UInt8(truncatingIfNeeded: destinationID.length) }

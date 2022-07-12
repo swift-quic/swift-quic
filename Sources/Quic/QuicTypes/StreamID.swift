@@ -15,4 +15,14 @@ struct StreamID: RawRepresentable {
   }
 }
 
-extension StreamID: Sendable, Hashable, Codable {}
+extension StreamID: QuicType {
+  init(with bytes: UnsafeBufferPointer<UInt8>) {
+    self.init(rawValue: RawValue(with: bytes))
+  }
+
+  func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    try rawValue.withUnsafeBytes(body)
+  }
+}
+
+extension StreamID: Codable {}

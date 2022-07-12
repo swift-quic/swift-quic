@@ -2,7 +2,7 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 protocol Header: Sendable, Hashable, Codable /* QuicType */ {
-  var firstByte: FirstByte { get }
+  var firstByte: UInt8 { get }
 }
 
 protocol LongHeader: Header {
