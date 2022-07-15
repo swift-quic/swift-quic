@@ -1,8 +1,8 @@
 //  Copyright Kenneth Laskoski. All Rights Reserved.
 //  SPDX-License-Identifier: Apache-2.0
 
-struct VersionNegotiationHeader: Header {
-  var firstByte: UInt8 { LongPacketType.initial.rawValue }
+struct VersionNegotiationHeader: LongHeader {
+  var firstByte: UInt8 { HeaderForm.long.rawValue | QuicBit.yes.rawValue | LongPacketType.initial.rawValue }
   var version: Version { Version.negotiation }
 
   var destinationIDLength: UInt8 { UInt8(truncatingIfNeeded: destinationID.length) }
