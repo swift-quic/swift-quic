@@ -24,5 +24,3 @@ extension StreamID: QuicType {
     try rawValue.withUnsafeBytes(body)
   }
 }
-
-extension StreamID: Codable {}
