@@ -2,10 +2,8 @@
 //  Version+Salt.swift
 //
 //
-//  Created by Brandon Toms on 4/4/23.
-//
-
-import Foundation
+//  Copyright Kenneth Laskoski. All Rights Reserved.
+//  SPDX-License-Identifier: Apache-2.0
 
 // Key Generation Params
 extension Version {
