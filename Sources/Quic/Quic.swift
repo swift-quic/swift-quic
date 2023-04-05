@@ -3,7 +3,7 @@
 
 let currentVersion: Version = { .version1 }()
 
-let supportedVersions: [Version] = { [.version1] }()
+let supportedVersions: [Version] = { [.version1, .versionDraft29] }()
 
 let knownVersions: [Version] =  {
   [
