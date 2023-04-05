@@ -12,6 +12,15 @@ struct Version: RawRepresentable {
 }
 
 extension Version {
+  /// https://datatracker.ietf.org/doc/draft-ietf-quic-v2/
+  static let version2: Version = 2
+  /// https://datatracker.ietf.org/doc/html/rfc9001
+  static let version1: Version = 1
+  /// https://datatracker.ietf.org/doc/html/draft-ietf-quic-tls-29
+  static let versionDraft29: Version = 0xff00_001d
+}
+
+extension Version {
   static let negotiation: Version = 0
 }
 
