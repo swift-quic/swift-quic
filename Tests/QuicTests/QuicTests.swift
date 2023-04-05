@@ -18,17 +18,15 @@ final class QuicTests: XCTestCase {
   }
 
   func testKnownVersions() throws {
+    XCTAssertTrue(isKnown(version: .version2))
     XCTAssertTrue(isKnown(version: .version1))
-    XCTAssertTrue(isKnown(version: .versionDraft27))
-    XCTAssertTrue(isKnown(version: .versionDraft28))
     XCTAssertTrue(isKnown(version: .versionDraft29))
   }
 
   func testSupportedVersions() throws {
+    XCTAssertFalse(isSupported(version: .version2))
     XCTAssertTrue(isSupported(version: .version1))
-    XCTAssertFalse(isSupported(version: .versionDraft27))
-    XCTAssertFalse(isSupported(version: .versionDraft28))
-    XCTAssertFalse(isSupported(version: .versionDraft29))
+    XCTAssertTrue(isSupported(version: .versionDraft29))
   }
 
   func testMinDatagramSize() throws {
