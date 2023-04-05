@@ -66,7 +66,6 @@ extension VarInt: QuicType {
   }
 }
 
-func bytes<T>(of value: T) -> [UInt8]
-where T: FixedWidthInteger {
+func bytes<T>(of value: T) -> [UInt8] where T: FixedWidthInteger {
   withUnsafeBytes(of: value.bigEndian) { $0.map { $0 } }
 }
