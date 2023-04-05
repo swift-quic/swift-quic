@@ -24,7 +24,9 @@ final class QuicTests: XCTestCase {
   }
 
   func testSupportedVersions() throws {
+    // Unsupported Versions
     XCTAssertFalse(isSupported(version: .version2))
+    // Supported Versions
     XCTAssertTrue(isSupported(version: .version1))
     XCTAssertTrue(isSupported(version: .versionDraft29))
   }
