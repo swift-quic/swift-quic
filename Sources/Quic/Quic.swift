@@ -7,9 +7,8 @@ let supportedVersions: [Version] = { [.version1] }()
 
 let knownVersions: [Version] =  {
   [
+    .version2,
     .version1,
-    .versionDraft27,
-    .versionDraft28,
     .versionDraft29,
   ]
 }()
