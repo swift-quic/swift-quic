@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "C47C2AD6-B0BA-46C2-888D-1034A607B90C",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "QuicTests",
+        "name" : "QuicTests"
+      }
+    }
+  ],
+  "version" : 1
+}
