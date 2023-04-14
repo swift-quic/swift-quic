@@ -36,7 +36,7 @@ extension HeaderProtector {
   }
 }
 
-public protocol QMasker {
+protocol QMasker {
   static func generateMask<SAMPLE>(sample: SAMPLE, using: SymmetricKey) throws -> [UInt8] where SAMPLE: ContiguousBytes
 }
 
