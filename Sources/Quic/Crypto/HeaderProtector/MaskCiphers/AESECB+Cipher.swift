@@ -3,7 +3,7 @@ import Crypto
 import _CryptoExtras
 import Foundation
 
-public struct AESECBMaskCipher:QMaskCipher {
+struct AESECBMaskCipher:QMaskCipher {
     typealias cipher = Crypto.AES.ECB
     let key:SymmetricKey
 
