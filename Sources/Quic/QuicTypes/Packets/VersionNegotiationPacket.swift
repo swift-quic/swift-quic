@@ -10,6 +10,14 @@ struct VersionNegotiationHeader: LongHeader {
 
   var sourceIDLength: UInt8 { UInt8(truncatingIfNeeded: sourceID.length) }
   let sourceID: ConnectionID
+  
+  var bytes:[UInt8] {
+    var bytes = [firstByte]
+    bytes += version.withUnsafeBytes { Array($0) }
+    bytes += destinationID.lengthPrefixedBytes
+    bytes += sourceID.lengthPrefixedBytes
+    return bytes
+  }
 }
 
 struct VersionNegotiationPacket: Packet {
