@@ -101,4 +101,38 @@ final class VarIntTests: XCTestCase {
       XCTAssertEqual(VarInt(with: pointer), maxUInt64)
     }
   }
+  
+  func testAppendix1VariableLengthIntegerDecoding_Read() throws {
+    let val1 = try Array(hexString: "0xc2197c5eff14e88c")
+    XCTAssertEqual(val1.readQuicVarInt(), 151_288_809_941_952_652)
+    
+    let val2 = try Array(hexString: "0x9d7f3e7d")
+    XCTAssertEqual(val2.readQuicVarInt(), 494_878_333)
+    
+    let val3 = try Array(hexString: "0x7bbd")
+    XCTAssertEqual(val3.readQuicVarInt(), 15_293)
+    
+    let val4 = try Array(hexString: "0x25")
+    XCTAssertEqual(val4.readQuicVarInt(), 37)
+    
+    let val5 = try Array(hexString: "0x4025")
+    XCTAssertEqual(val5.readQuicVarInt(), 37)
+  }
+  
+  func testAppendix1VariableLengthIntegerDecoding_Write() throws {
+    let val1 = writeQuicVarInt(151_288_809_941_952_652)
+    XCTAssertEqual(val1, try Array(hexString: "0xc2197c5eff14e88c"))
+    
+    let val2 = writeQuicVarInt(494_878_333)
+    XCTAssertEqual(val2, try Array(hexString: "0x9d7f3e7d"))
+    
+    let val3 = writeQuicVarInt(15_293)
+    XCTAssertEqual(val3, try Array(hexString: "0x7bbd"))
+    
+    let val4 = writeQuicVarInt(37)
+    XCTAssertEqual(val4, try Array(hexString: "0x25"))
+    
+    let val5 = writeQuicVarInt(37, minBytes: 2)
+    XCTAssertEqual(val5, try Array(hexString: "0x4025"))
+  }
 }
