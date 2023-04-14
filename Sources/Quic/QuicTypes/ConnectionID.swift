@@ -11,6 +11,12 @@ struct ConnectionID: RawRepresentable {
   }
 
   var length: Int { data.count }
+  
+  /// Returns the ConnectionID's raw value prefixed with it's byte length as a UVarInt
+  var lengthPrefixedBytes:[UInt8] {
+    if length == 0 { return [0x00] }
+    return putUVarInt(UInt64(self.length)) + self.data
+  }
 }
 
 extension ConnectionID: ExpressibleByArrayLiteral {
