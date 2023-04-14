@@ -60,3 +60,16 @@ func isNegotiation(version: Version) -> Bool {
 func isReserved(version: Version) -> Bool {
   version.isReserved()
 }
+
+extension Version:CustomStringConvertible {
+  var description: String {
+    switch self {
+    case .version2: return "Version 2"
+    case .version1: return "Version 1"
+    case .versionDraft29: return "Draft 29"
+    case .negotiation: return "Negotation"
+    default:
+      return "Unknown Version `\(data)`"
+    }
+  }
+}
