@@ -31,8 +31,10 @@ extension HeaderProtector {
     }
     // Apply the mask to the packet number
     header.xorSubrange(from: packetNumberOffset, to: header.count, with: Array(mask[1...]))
-
-    hdrBytes = header as! BYTES
+    
+    // Drop unused packet number bytes if necessary
+    guard let pnl = PacketNumberLength(rawValue: header[0] & PacketNumberLength.mask) else { throw Errors.InvalidPacket }
+    hdrBytes = Array(header.dropLast(4 - pnl.bytesToRead)) as! BYTES
   }
 }
 
