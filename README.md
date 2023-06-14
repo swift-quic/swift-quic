@@ -2,7 +2,7 @@
 
 Swift implementation of the IETF [QUIC](https://quicwg.github.io/) protocol.
 
-### Welcome to the Developemnt Branch of Swift QUIC
+### Welcome to the Development Branch of Swift QUIC
 > ⚠️ As the name suggests, this branch is under heavy development and isn't guaranteed to build / run without errors.
 
 ### Current Progress
