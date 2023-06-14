@@ -161,7 +161,7 @@ struct QuicStateMachine {
     }
 }
 
-final class QUICClientHandler: ChannelDuplexHandler, QuicStateProvider, NIOSSLQuicDelegate {
+final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     // typealias changes to wrap out ByteBuffer in an AddressedEvelope which describes where the packages are going
     public typealias InboundIn = Packet
     public typealias InboundOut = ByteBuffer
