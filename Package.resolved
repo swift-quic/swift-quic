@@ -21,10 +21,10 @@
     {
       "identity" : "swift-crypto",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/btoms20/swift-crypto.git",
+      "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "branch" : "feature/ChaCha20+Counter",
-        "revision" : "82c9ee6aa65a333b6e9e76e627504f2ac09e16d7"
+        "revision" : "33a20e650c33f6d72d822d558333f2085effa3dc",
+        "version" : "2.5.0"
       }
     },
     {
@@ -32,8 +32,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "e0cc6dd6ffa8e6a6f565938acd858b24e47902d0",
-        "version" : "2.50.0"
+        "revision" : "f7c46552983b06b0958a1a4c8bc5199406ae4c8a",
+        "version" : "2.51.0"
+      }
+    },
+    {
+      "identity" : "swift-nio-ssl",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/btoms20/swift-nio-ssl.git",
+      "state" : {
+        "branch" : "quic",
+        "revision" : "a429bd146a5150a97e59d8a44d053bbde1793a1d"
       }
     }
   ],
