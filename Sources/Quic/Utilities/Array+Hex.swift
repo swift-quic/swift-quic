@@ -11,7 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-// Modified
+//
+// Modified by the SwiftQUIC project authors
 
 import Foundation
 
@@ -29,57 +30,54 @@ private func itoh(_ value: UInt8) -> UInt8 {
 
 private func htoi(_ value: UInt8) throws -> UInt8 {
     switch value {
-    case char0...char0 + 9:
-        return value - char0
-    case charA...charA + 5:
-        return value - charA + 10
-    default:
-        throw ByteHexEncodingErrors.incorrectHexValue
+        case char0...char0 + 9:
+            return value - char0
+        case charA...charA + 5:
+            return value - charA + 10
+        default:
+            throw ByteHexEncodingErrors.incorrectHexValue
     }
 }
 
 extension Array where Element == UInt8 {
     init(hexString: String) throws {
         self.init()
-        
+
         guard !hexString.isEmpty, hexString.count.isMultiple(of: 2) else {
             throw ByteHexEncodingErrors.incorrectString
         }
-        
+
         let stringBytes: [UInt8]
         if hexString.hasPrefix("0x") {
             stringBytes = Array(hexString.dropFirst(2).data(using: String.Encoding.utf8)!)
         } else {
             stringBytes = Array(hexString.data(using: String.Encoding.utf8)!)
         }
-            
-        for i in 0...((stringBytes.count/2) - 1) {
+
+        for i in 0...((stringBytes.count / 2) - 1) {
             let char1 = stringBytes[2 * i]
             let char2 = stringBytes[2 * i + 1]
 
             try self.append(htoi(char1) << 4 + htoi(char2))
         }
     }
-
 }
 
 extension DataProtocol {
     var hexString: String {
-        get {
-            let hexLen = self.count * 2
-            let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: hexLen)
-            var offset = 0
+        let hexLen = self.count * 2
+        let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: hexLen)
+        var offset = 0
 
-            self.regions.forEach { (_) in
-                for i in self {
-                    ptr[Int(offset * 2)] = itoh((i >> 4) & 0xF)
-                    ptr[Int(offset * 2 + 1)] = itoh(i & 0xF)
-                    offset += 1
-                }
+        self.regions.forEach { _ in
+            for i in self {
+                ptr[Int(offset * 2)] = itoh((i >> 4) & 0xF)
+                ptr[Int(offset * 2 + 1)] = itoh(i & 0xF)
+                offset += 1
             }
-
-            return String(bytesNoCopy: ptr, length: hexLen, encoding: .utf8, freeWhenDone: true)!
         }
+
+        return String(bytesNoCopy: ptr, length: hexLen, encoding: .utf8, freeWhenDone: true)!
     }
 }
 
