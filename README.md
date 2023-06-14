@@ -30,4 +30,4 @@ Swift implementation of the IETF [QUIC](https://quicwg.github.io/) protocol.
 - [SwiftNIO](https://github.com/apple/swift-nio) - Most of the NIO networking code is heavily inspired by existing NIO projects. Massive thanks and credit to the SwiftNIO team.
 - [Quiche](https://github.com/cloudflare/quiche/tree/master)
 - [Go Quic](https://github.com/quic-go/quic-go)
-- [Kenneth Laskoski]](https://github.com/kennethlaskoski) for kickstarting this effort!
+- [Kenneth Laskoski](https://github.com/kennethlaskoski) for kickstarting this effort!
