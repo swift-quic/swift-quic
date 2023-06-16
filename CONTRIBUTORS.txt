@@ -7,5 +7,6 @@ needs to be listed here.
 
 ### Contributors
 
-- Kenneth Laskoski <>
+- Kenneth Laskoski
+- Karthikdasari0423
 - Brandon Toms <btoms.20@gmail.com>
