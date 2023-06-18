@@ -17,7 +17,6 @@ import NIOCore
 import NIOSSL
 
 final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
-    // typealias changes to wrap out ByteBuffer in an AddressedEvelope which describes where the packages are going
     public typealias InboundIn = Packet
     public typealias InboundOut = ByteBuffer
     public typealias OutboundOut = [any Packet]
@@ -34,7 +33,6 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
 
     let mode: EndpointRole = .server
     let version: Quic.Version
-    var trafficCipherSuite: CipherSuite?
 
     var retiredDCIDs: [ConnectionID] = []
     var dcid: Quic.ConnectionID {
@@ -53,9 +51,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     }
 
     private var storedContext: ChannelHandlerContext!
-    private var chosenCipherSuite: CipherSuite = .AESGCM128_SHA256
 
-    //var cumulativeCrypto:ByteBuffer = ByteBuffer()
     var partialCryptoBuffer: ByteBuffer = ByteBuffer()
 
     // Quic Delegate Protocol Conformance
@@ -277,13 +273,9 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
             case .sentDisconnect:
                 print("QUICServerHandler::ChannelRead::TODO - Handle Sent Disconnect")
         }
-
-        /// Pass the byte buffer along the pipeline
-        //context.fireChannelRead( wrapInboundOut(envelope.data) )
     }
 
     public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
-        //logger.trace("--- Wrapping outbound data in UDP Envelope ---")
         var buffer = unwrapOutboundIn(data)
         print("QUICServerHandler::Write")
         print(buffer.readableBytesView.hexString)
@@ -304,7 +296,6 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         // Get our chosen cipher suite
                         guard let sh = try? ServerHello(header: [], payload: &serverHello) else { print("QUICServerHandler::Failed to parse ServerHello"); return }
                         guard let cs = try? CipherSuite( sh.cipherSuite ) else { print("QUICServerHandler::Unsupported Cipher Suite `\(sh.cipherSuite)`. Abort Handshake"); return }
-                        self.chosenCipherSuite = cs
                         print("QUICServerHandler::ChannelRead::Updated CipherSuite \(cs)")
 
                         // TODO: Update our DCID and SCID
@@ -381,9 +372,6 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
             case .sentDisconnect:
                 print("QUICServerHandler::Write::TODO:Handle Sent Disconnect")
         }
-
-        //let envelope = AddressedEnvelope(remoteAddress: remoteAddress, data: buffer)
-        //context.write( wrapOutboundOut(envelope), promise: nil)
     }
 
     public func flush(context: ChannelHandlerContext) {
