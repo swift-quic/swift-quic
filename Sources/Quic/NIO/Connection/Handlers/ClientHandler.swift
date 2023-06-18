@@ -70,9 +70,9 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
             // TODO: Do we need to update our Connection Muxer
         }
     }
-    
-    private var storedContext: ChannelHandlerContext!    
-    
+
+    private var storedContext: ChannelHandlerContext!
+
     // Quic Delegate Protocol Conformance
     private var transportParams: TransportParams
     var ourParams: [UInt8] {
@@ -328,7 +328,7 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         let firstHandshakePacket = HandshakePacket(header: firstHandshakeHeader, payload: [])
 
                         context.write( wrapOutboundOut([secondInitialPacket, firstHandshakePacket]), promise: nil)
-                    
+
                         return
 
                     // - The other containing the Cert Verify and Handshake Finished message
