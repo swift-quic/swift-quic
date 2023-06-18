@@ -23,135 +23,6 @@ struct QuicStateMachine {
         case done
     }
 
-    struct QuicHandshakeStateMachine: Equatable {
-        private enum State: Equatable {
-            case idle
-            case processedClientHello
-            case processedServerHello
-            case processedEncryptedExtensions
-            case processedCertificate
-            case processedCertVerify
-            case processedServerFinished
-            case processedClientFinished
-            case processedDone
-        }
-
-        private var state: State {
-            didSet { print("HandshakeStateMachine::State Transitioned from \(oldValue) -> \(self.state)") }
-        }
-
-        private var mode: EndpointRole
-
-        public enum Errors: Error {
-            case invalidStateTransition
-            case unexpectedLeftoverData
-        }
-
-        internal init(mode: EndpointRole) {
-            self.mode = mode
-            self.state = .idle
-        }
-
-        public mutating func processCryptoFrame(_ frame: Frames.Crypto) throws {
-            // Inspect Crypto Frame
-            var buf = ByteBuffer(bytes: frame.data)
-
-            switch self.mode {
-                case .client:
-                    while buf.readableBytes > 0 {
-                        try self.processCryptoFrameAsClient(&buf)
-                    }
-
-                case .server:
-                    while buf.readableBytes > 0 {
-                        try self.processCryptoFrameAsServer(&buf)
-                    }
-            }
-        }
-
-        private mutating func processCryptoFrameAsClient(_ buf: inout ByteBuffer) throws {
-            switch self.state {
-                case .idle:
-                    // This outbound crypto frame should include only a ClientHello
-                    guard let clientHello = buf.readTLSClientHello() else { throw Errors.invalidStateTransition }
-                    guard buf.readableBytes == 0 else { throw Errors.unexpectedLeftoverData }
-                    self.state = .processedClientHello
-
-                case .processedClientHello:
-                    // This inbound crypto frame should include at least a ServerHello
-                    guard let serverHello = buf.readTLSServerHello() else { throw Errors.invalidStateTransition }
-                    self.state = .processedServerHello
-
-                case .processedServerHello:
-                    guard let encExtensions = buf.readTLSEncryptedExtensions() else { throw Errors.invalidStateTransition }
-                    self.state = .processedEncryptedExtensions
-
-                case .processedEncryptedExtensions:
-                    guard let cert = buf.readTLSCertificate() else { throw Errors.invalidStateTransition }
-                    self.state = .processedCertificate
-
-                case .processedCertificate:
-                    guard let certVerify = buf.readTLSCertificateVerify() else { throw Errors.invalidStateTransition }
-                    self.state = .processedCertVerify
-
-                case .processedCertVerify:
-                    guard let serverFinished = buf.readTLSHandshakeFinished() else { throw Errors.invalidStateTransition }
-                    self.state = .processedServerFinished
-
-                case .processedServerFinished:
-                    // This outbound crypto frame should include at least a clientFinish
-                    guard let clientFinished = buf.readTLSHandshakeFinished() else { throw Errors.invalidStateTransition }
-                    self.state = .processedClientFinished
-
-                    self.state = .processedDone
-
-                case .processedClientFinished, .processedDone:
-                    print("HandshakeStateMachine::Already Done!")
-            }
-        }
-
-        private mutating func processCryptoFrameAsServer(_ buf: inout ByteBuffer) throws {
-            switch self.state {
-                case .idle:
-                    // This inbound crypto frame should include only a ClientHello
-                    guard let clientHello = buf.readTLSClientHello() else { throw Errors.invalidStateTransition }
-                    guard buf.readableBytes == 0 else { throw Errors.unexpectedLeftoverData }
-                    self.state = .processedClientHello
-
-                case .processedClientHello:
-                    // This outbound crypto frame should include at least a ServerHello
-                    guard let serverHello = buf.readTLSServerHello() else { throw Errors.invalidStateTransition }
-                    self.state = .processedServerHello
-
-                case .processedServerHello:
-                    guard let encExtensions = buf.readTLSEncryptedExtensions() else { throw Errors.invalidStateTransition }
-                    self.state = .processedEncryptedExtensions
-
-                case .processedEncryptedExtensions:
-                    guard let cert = buf.readTLSCertificate() else { throw Errors.invalidStateTransition }
-                    self.state = .processedCertificate
-
-                case .processedCertificate:
-                    guard let certVerify = buf.readTLSCertificateVerify() else { throw Errors.invalidStateTransition }
-                    self.state = .processedCertVerify
-
-                case .processedCertVerify:
-                    guard let serverFinished = buf.readTLSHandshakeFinished() else { throw Errors.invalidStateTransition }
-                    self.state = .processedServerFinished
-
-                case .processedServerFinished:
-                    // This inbound crypto frame should include at least a clientFinish
-                    guard let clientFinished = buf.readTLSHandshakeFinished() else { throw Errors.invalidStateTransition }
-                    self.state = .processedClientFinished
-
-                    self.state = .processedDone
-
-                case .processedClientFinished, .processedDone:
-                    print("HandshakeStateMachine::Already Done!")
-            }
-        }
-    }
-
     enum State: Equatable {
         case idle
         case handshaking(HandshakeState)
@@ -179,7 +50,6 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
 
     let mode: EndpointRole = .client
     let version: Quic.Version
-    var trafficCipherSuite: CipherSuite?
 
     var retiredDCIDs: [ConnectionID] = []
     var dcid: Quic.ConnectionID {
@@ -200,11 +70,9 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
             // TODO: Do we need to update our Connection Muxer
         }
     }
-
-    private var storedContext: ChannelHandlerContext!
-    private var chosenCipherSuite: CipherSuite = .AESGCM128_SHA256
-    // Inline Stream Muxer
-
+    
+    private var storedContext: ChannelHandlerContext!    
+    
     // Quic Delegate Protocol Conformance
     private var transportParams: TransportParams
     var ourParams: [UInt8] {
@@ -320,29 +188,6 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
         context.fireChannelInactive()
     }
 
-//    public func channelRead2(context: ChannelHandlerContext, data: NIOAny) {
-//        let packet = unwrapInboundIn(data)
-//
-//        switch state {
-//        case .idle:
-//            return
-//        case .handshaking(let handshakeStateMachine):
-//            for frame in packet.payload {
-//                if let cryptoFrame = frame as? Frames.Crypto {
-//                    try handshakeStateMachine.processCryptoFrame(cryptoFrame)
-//                } else if handshakeStateMachine.canProcessTrafficFrames {
-//                    self.processFrame(frame)
-//                }
-//            }
-//        case .active:
-//            for frame in packet.payload {
-//                self.processFrame(frame)
-//            }
-//        case .receivedDisconnect, .sentDisconnect:
-//            return
-//        }
-//    }
-
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let packet = unwrapInboundIn(data)
 
@@ -365,17 +210,10 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         self.dcid = serverInitial.header.sourceID
 
                         // Break Payload up into frames and process them... (we expect both an ACK and a Crypto frame)
-                        //var serverInitialPayloadBuffer = ByteBuffer(bytes: serverInitial.payload)
                         guard serverInitial.payload.count >= 2 else { print("Expected ACK and Crypto Frames in Server Initial: \(serverInitial.payload)"); return }
 
                         // We expect an ACK frame
                         guard let ack = serverInitial.payload[0] as? Frames.ACK else { print("QUICClientHandler::ChannelRead::Expected ACK Frame, didn't get it"); return }
-                        // Feed the ack into the ACKManager
-                        //ackManager.process(ack: ack, for: .Initial)
-                        // Maybe read padding...
-                        //serverInitialPayloadBuffer.readPaddingFrame()
-                        // Read the Crypto Frame
-                        //guard let contents = serverInitialPayloadBuffer.getQuicCryptoFrameContents() else { print("QUICClientHandler::ChannelRead::Expected Crypto Frame, didn't get it"); return }
                         guard let cryptoFrame = serverInitial.payload[1] as? Frames.Crypto else { print("QUICClientHandler::ChannelRead::Expected Crypto Frame, didn't get it"); return }
 
                         // ServerHello
@@ -385,7 +223,6 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         // Get our cipher suite
                         guard let sh = try? ServerHello(header: [], payload: &serverHello) else { print("Failed to parse ServerHello"); return }
                         guard let cs = try? CipherSuite( sh.cipherSuite ) else { print("Unsupported Cipher Suite `\(sh.cipherSuite)`. Abort Handshake"); return }
-                        self.chosenCipherSuite = cs
                         print("QUICClientHandler::ChannelRead::Updated CipherSuite \(cs)")
 
                         // If we have extra crypto
@@ -397,9 +234,7 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
 
                         // Pass the Crypto Frame along the pipeline (the NIOSSLHandler will pick it up and consume it)
                         var cryptoBuf = ByteBuffer()
-                        //cryptoBuf.writeBytes(contents)
                         cryptoFrame.encode(into: &cryptoBuf)
-                        //cryptoFrame.encode(into: &cumulativeCrypto)
                         context.fireChannelRead(self.wrapInboundOut(cryptoBuf))
 
                         // Increment our state
@@ -415,10 +250,8 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         guard let serverHandshake = packet as? HandshakePacket else { print("QUICClientHandler::ChannelRead::Invalid Packet `\(PacketType(packet.header.firstByte)!)` for State `\(self.state)`"); return }
 
                         print("QUICClientHandler::ChannelRead::Processing First Handshake")
-                        //var serverHandshakePayloadBuffer = ByteBuffer(bytes: serverHandshake.payload)
 
                         // Ensure the handshake packet contains a single crypto frame
-                        //guard let contents = serverHandshakePayloadBuffer.getQuicCryptoFrameContents() else { print("QUICClientHandler::ChannelRead::Expected Crypto Frame, didn't get it"); return }
                         guard let cryptoFrame = serverHandshake.payload.first as? Frames.Crypto else { print("QUICClientHandler::ChannelRead::Expected Crypto Frame, didn't get it"); return }
 
                         // TODO: Ensure this crypto frame contains the TLS Encrypted Extensions and the Certificate
@@ -478,21 +311,14 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                             }
                         }
 
-                        // We either call...
-                        // self.ackHandler.flushPendingACKs() // let the ACK handler prepare and populate the necessary packets
-                        // or...
-                        // we send and empty packet along...
-
-                        //let acks = ackManager.getAllACKs()
-                        //guard let initialACK = acks.initial, let handshakeACK = acks.handshake else { print("QUICClientHandler::ChannelRead::Expected two ACKs, one Initial and one Handshake"); return }
-
                         // At this point we should ACK the Server Initial Packet and the first Server Handshake Packet
+                        // We do this by sending an empty packet along to our ACKHandler. If the ACKHandler has a pending ACK for that epoch, it'll inject the ACK into the packet, otherwise the empty packet will be dropped by the packet protector handler.
                         let secondInitialHeader = InitialHeader(
                             version: version,
                             destinationID: dcid,
                             sourceID: scid
                         )
-                        var secondInitialPacket = InitialPacket(header: secondInitialHeader, payload: [])
+                        let secondInitialPacket = InitialPacket(header: secondInitialHeader, payload: [])
 
                         let firstHandshakeHeader = HandshakeHeader(
                             version: version,
@@ -501,24 +327,8 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         )
                         let firstHandshakePacket = HandshakePacket(header: firstHandshakeHeader, payload: [])
 
-                        // Pad the initial packets payload
-                        //let paddingNeeded = 1200 - (secondInitialPacket.headerBytes.count + secondInitialPacket.serializedPayload.count + firstHandshakePacket.headerBytes.count + firstHandshakePacket.serializedPayload.count)
-                        //secondInitialPacket.payload = [Frames.Padding(length: paddingNeeded)] + secondInitialPacket.payload
-
                         context.write( wrapOutboundOut([secondInitialPacket, firstHandshakePacket]), promise: nil)
-
-                        // Pass the Crypto Frame along the pipeline (the NIOSSLHandler will pick it up and consume it)
-                        //let newCryptoFrame = Frames.Crypto(offset: VarInt(integerLiteral: 0), data: encryptedExtensions + certificate)
-                        //var cryptoBuf = ByteBuffer()
-                        //cryptoBuf.writeBytes(encryptedExtensions)
-                        //cryptoBuf.writeBytes(certificate)
-                        //newCryptoFrame.encode(into: &cryptoBuf)
-                        //newCryptoFrame.encode(into: &cumulativeCrypto)
-                        //defer {
-                        //    print("Passing second crypto frame to SSL")
-                        //    context.fireChannelRead(self.wrapInboundOut(cryptoBuf))
-                        //}
-
+                    
                         return
 
                     // - The other containing the Cert Verify and Handshake Finished message
@@ -526,7 +336,6 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         guard let serverHandshake = packet as? HandshakePacket else { print("QUICClientHandler::ChannelRead::Invalid Packet `\(PacketType(packet.header.firstByte)!)` for State `\(self.state)`"); return }
 
                         print("QUICClientHandler::ChannelRead::Processing Second Handshake")
-                        //var serverHandshakePayloadBuffer = ByteBuffer(bytes: serverHandshake.payload)
 
                         // Ensure the handshake packet contains a single crypto frame
                         guard let cryptoFrame = serverHandshake.payload.first as? Frames.Crypto else { print("QUICClientHandler::ChannelRead::Expected Crypto Frame, didn't get it"); return }
@@ -549,13 +358,7 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         Frames.Crypto(offset: VarInt(integerLiteral: 0), data: handshakeFinished).encode(into: &cryptoBuf2)
                         context.fireChannelRead(self.wrapInboundOut(cryptoBuf2))
 
-                        //let newCryptoFrame = Frames.Crypto(offset: VarInt(integerLiteral: 0), data: Array(partialCryptoBuffer.readableBytesView))
-                        //var cryptoBuf = ByteBuffer()
-                        //newCryptoFrame.encode(into: &cryptoBuf)
-                        //newCryptoFrame.encode(into: &cumulativeCrypto)
-                        //context.fireChannelRead(self.wrapInboundOut(cryptoBuf))
-
-                        self.state = .handshaking(.done) //.handshaking(.done)
+                        self.state = .handshaking(.done)
 
                         return
 
@@ -565,14 +368,9 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         // We expect one more Handshake Packet ack'ing the ones we sent
                         guard let lastServerHandshake = packet as? HandshakePacket else { print("QUICClientHandler::ChannelRead::Invalid Packet `\(PacketType(packet.header.firstByte)!)` for State `\(self.state)`"); return }
 
-                        //var lastHandshakePayloadBuffer = ByteBuffer(bytes: lastServerHandshake.payload)
                         // The payload should contain a single ACK Frame
-                        //let ack = lastHandshakePayloadBuffer.readACKFrame()
                         guard lastServerHandshake.payload.count == 1, let frame = lastServerHandshake.payload.first else { print("Expected only a single ACK Frame: \(packet.payload)"); return }
 
-                        //if let ackFrame = frame as? Frames.ACK {
-                        //    ackManager.process(ack: ackFrame, for: .Handshake)
-                        //} else
                         if let closeFrame = frame as? Frames.ConnectionClose {
                             print("QUICClientHandler::ChannelRead::Received Connection Closed Frame: \(closeFrame)")
                             self.state = .receivedDisconnect
@@ -630,7 +428,6 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     }
 
     public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
-        //logger.trace("--- Wrapping outbound data in UDP Envelope ---")
         var buffer = unwrapOutboundIn(data)
         print("QUICClientHandler::Write::\(buffer.readableBytesView.hexString)")
 
@@ -643,9 +440,6 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         guard let cryptoFrame = buffer.readCryptoFrame() else { print("Expected Crypto Frame (Client Hello), didn't get it..."); return }
 
                         // We have an initial client hello crypto frame lets bundle it into an InitialPacket and send it along...
-                        //let pn = ackManager.nextPacketNumber(for: .Initial)
-                        //let initialHeader = InitialHeader(version: version, destinationID: dcid, sourceID: scid, packetNumber: pn.bytes(minBytes: 4, bigEndian: true))
-                        //let packet = InitialPacket(header: initialHeader, payload: [Frames.Padding(length: 1195 - cryptoFrame.serializedByteCount), cryptoFrame])
                         let initialHeader = InitialHeader(version: version, destinationID: dcid, sourceID: scid)
                         let packet = InitialPacket(header: initialHeader, payload: [cryptoFrame])
 
@@ -656,12 +450,8 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         print("QUICClientHandler::TODO:Handle Handshake")
 
                         guard let cryptoFrame = buffer.readCryptoFrame() else { print("Expected Client Handshake Done Crypto Frame, didn't get it..."); return }
-                        //cumulativeCrypto.writeBytes(buffer.readableBytesView)
                         // Send a handshake packet with the Crypto Frame containing the TLS Client Handshake Done frame and an ACK
-                        //let pn = ackManager.nextPacketNumber(for: .Handshake)
                         let handshakeHeader = HandshakeHeader(version: version, destinationID: dcid, sourceID: scid) //, packetNumber: pn.bytes(minBytes: 1, bigEndian: true))
-                        //var frames:[Frame] = [cryptoFrame]
-                        //if let ack = ackManager.getACK(for: .Handshake) { frames.insert(ack, at: 0) }
 
                         let handshakePacket = HandshakePacket(header: handshakeHeader, payload: [cryptoFrame])
 
@@ -687,23 +477,14 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                 print("QUICClientHandler::TODO:Handle Short / Traffic Packets")
 
                 var packets: [any Packet] = []
-//            if let handshakeACK = ackManager.getACK(for: .Handshake) {
-//                print("We need to ACK a handshake packet!")
-//                let pn = ackManager.nextPacketNumber(for: .Handshake)
-//                let handshakeHeader = HandshakeHeader(version: version, destinationID: dcid, sourceID: scid, packetNumber: pn.bytes(minBytes: 2))
-//                packets.append(HandshakePacket(header: handshakeHeader, payload: [handshakeACK]))
-//            }
+
                 if self.ackHandler.manager.handshake.needsToSendACK {
                     packets.append(HandshakePacket(header: HandshakeHeader(version: self.version, destinationID: self.dcid, sourceID: self.scid), payload: []))
                 }
 
                 // Construct our first Traffic Packet
-                //let pn = ackManager.nextPacketNumber(for: .Application)
                 let trafficHeader = GenericShortHeader(firstByte: 0b01000001, id: dcid, packetNumber: [0x00])
-                //var frames:[Frame] = []
                 guard let streamFrame = buffer.readStreamFrame() else { print("Expected Stream Frame, didn't get it..."); return }
-                //frames.append(streamFrame)
-                //if let trafficACK = ackManager.getACK(for: .Application) { frames.insert(trafficACK, at: 0) }
 
                 packets.append(ShortPacket(header: trafficHeader, payload: [streamFrame]))
 
@@ -715,9 +496,6 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
             case .sentDisconnect:
                 print("QUICClientHandler::TODO:Handle Sent Disconnect")
         }
-
-        //let envelope = AddressedEnvelope(remoteAddress: remoteAddress, data: buffer)
-        //context.write( wrapOutboundOut(envelope), promise: nil)
     }
 
     public func flush(context: ChannelHandlerContext) {
@@ -773,36 +551,4 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
             }
         }
     }
-
-//    private func sendTrafficPacket(context:ChannelHandlerContext, payload buffer:ByteBuffer) {
-//        // Get the next packet number
-//        let pn = ackManager.nextPacketNumber(for: .Application)
-//        // Build the header
-//        let trafficHeader = GenericShortHeader(firstByte: 0b01000001, id: dcid, packetNumber: pn.bytes(minBytes: 2))
-//        // Build the payload
-//        var payload = ByteBuffer()
-//        // Get any outstanding ACKs
-//        if let trafficACK = ackManager.getACK(for: .Application) {
-//            trafficACK.encode(into: &payload)
-//        }
-//        // Write the buffer into the payload
-//        payload.writeBytes(buffer.readableBytesView)
-//        // Prefix the payload with Padding if necessary
-//        let padding:Array<UInt8>
-//        if payload.readableBytes < 16 {
-//            // write some padding
-//            padding = Array<UInt8>(repeating: 0x00, count: 16 - payload.readableBytes)
-//        } else { padding = [] }
-//        // Construct the traffic packet
-//        let trafficPacket = ShortPacket(header: trafficHeader, payload: padding + Array(payload.readableBytesView))
-//        // Encrypt the traffic packet
-//        guard let encTraffic = try? trafficPacket.seal(using: trafficKeys) else { print("Failed to encrypt traffic packet"); return }
-//        // Build the AddressedEnvelope
-//        let envelopePayload = ByteBuffer(bytes: encTraffic.protectedHeader + encTraffic.encryptedPayload)
-//        let envelope = AddressedEnvelope(remoteAddress: remoteAddress, data: envelopePayload)
-//        // Send it
-//        print("Writing Envelope Containing: \(trafficPacket)")
-//        print("Destined for: \(remoteAddress)")
-//        context.write( wrapOutboundOut(envelope), promise: nil)
-//    }
 }
