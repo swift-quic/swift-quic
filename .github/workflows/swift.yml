@@ -12,7 +12,9 @@ on:
 jobs:
   build:
     name: Swift build and test
-    runs-on: [ubuntu-latest, macos-latest]
+# TODO: add ubuntu
+#    runs-on: [ubuntu-latest, macos-latest]
+    runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v3
