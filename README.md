@@ -2,9 +2,10 @@
 
 Swift implementation of the IETF [QUIC](https://quicwg.github.io/) protocol.
 
+[![Swift](https://github.com/swift-quic/swift-quic/actions/workflows/swift.yml/badge.svg)](https://github.com/swift-quic/swift-quic/actions/workflows/swift.yml)
 
-### Welcome to the Development Branch of Swift QUIC
-> ⚠️ As the name suggests, this branch is under heavy development and isn't guaranteed to build / run without errors.
+### Welcome to SwiftQuic
+> ⚠️  This implementation is under heavy development and is not ready for production!
 
 ### Current Progress
 - [x] Complete a standard handshake using TLS 1.3
