@@ -5,19 +5,33 @@ name: Swift
 
 on:
   push:
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+      - 'CONTRIBUTORS.txt'
     branches: [ "main", "develop" ]
   pull_request:
     branches: [ "main", "develop" ]
 
 jobs:
-  build:
+  build-macos:
     name: Swift build and test
-# TODO: add ubuntu
-#    runs-on: [ubuntu-latest, macos-latest]
     runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v3
+    - name: Build
+      run: swift build -v
+    - name: Run tests
+      run: swift test -v
+
+  build-linux:
+    name: Linux build and test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: swift-actions/setup-swift@v1
     - name: Build
       run: swift build -v
     - name: Run tests
