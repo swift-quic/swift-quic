@@ -13,9 +13,9 @@ Swift implementation of the IETF [QUIC](https://quicwg.github.io/) protocol.
 - [x] Complete a standard handshake using TLS 1.3
 - [x] Open a stream and echo data
 > Note: The above can be done between either...
->    - A [Swift Server and Client](https://github.com/kennethlaskoski/swift-quic/tree/develop/Tests/QuicTests/NIOTests/HandshakeTests.swift) or
+>    - A [Swift Server and Client](https://github.com/swift-quic/swift-quic/tree/develop/Tests/QuicTests/NIOTests/HandshakeTests.swift) or
 >    - Between Swift and Go (using the [Go Quic](https://github.com/quic-go/quic-go) library)
->        - Check out the [GoInteropTests](https://github.com/kennethlaskoski/swift-quic/tree/develop/Tests/QuicTests/NIOTests/GoInteropTests) for more info.
+>        - Check out the [GoInteropTests](https://github.com/swift-quic/swift-quic/tree/develop/Tests/QuicTests/NIOTests/GoInteropTests) for more info.
 
 ### How It Works
 - All of the Crypto stuff is mostly contained with the [Crypto](https://github.com/swift-quic/swift-quic/tree/develop/Sources/Quic/Crypto) folder and the [`PacketProtectorHandler`](https://github.com/swift-quic/swift-quic/blob/develop/Sources/Quic/NIO/Connection/Handlers/PacketProtectorHandler.swift)
