@@ -31,7 +31,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - uses: swift-actions/setup-swift@v1
+    - uses: swift-actions/setup-swift@v1.23.0
     - name: Build
       run: swift build -v
     - name: Run tests
