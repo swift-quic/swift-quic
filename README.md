@@ -1,12 +1,10 @@
-# swift-quic
-
-Swift implementation of the IETF [QUIC](https://quicwg.github.io/) protocol.
+# SwiftQuic
+SwiftQuic is an open-source [Swift] implementation of the [QUIC] protocol.
 
 [![Swift](https://github.com/swift-quic/swift-quic/actions/workflows/swift.yml/badge.svg)](https://github.com/swift-quic/swift-quic/actions/workflows/swift.yml)
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fswift-quic%2Fswift-quic%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/swift-quic/swift-quic)
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fswift-quic%2Fswift-quic%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/swift-quic/swift-quic)
 
-### Welcome to SwiftQuic
 > ⚠️  This implementation is under heavy development and is not ready for production!
 
 ### Current Progress
@@ -43,3 +41,6 @@ Swift implementation of the IETF [QUIC](https://quicwg.github.io/) protocol.
 - [Quiche](https://github.com/cloudflare/quiche/tree/master)
 - [Go Quic](https://github.com/quic-go/quic-go)
 - [Kenneth Laskoski](https://github.com/kennethlaskoski) for kickstarting this effort!
+
+[QUIC]: https://www.rfc-editor.org/info/rfc9000
+[Swift]: https://www.swift.org/about
