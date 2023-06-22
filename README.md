@@ -16,7 +16,7 @@ SwiftQuic is an open-source [Swift] implementation of the [QUIC] protocol.
 >        - Check out the [GoInteropTests](https://github.com/swift-quic/swift-quic/tree/develop/Tests/QuicTests/NIOTests/GoInteropTests) for more info.
 
 ### How It Works
-- All of the Crypto stuff is mostly contained with the [Crypto](https://github.com/swift-quic/swift-quic/tree/develop/Sources/Quic/Crypto) folder and the [`PacketProtectorHandler`](https://github.com/swift-quic/swift-quic/blob/develop/Sources/Quic/NIO/Connection/Handlers/PacketProtectorHandler.swift)
+- All of the Crypto stuff is mostly contained within the [Crypto](https://github.com/swift-quic/swift-quic/tree/develop/Sources/Quic/Crypto) folder and the [`PacketProtectorHandler`](https://github.com/swift-quic/swift-quic/blob/develop/Sources/Quic/NIO/Connection/Handlers/PacketProtectorHandler.swift)
 - The NIO Pipeline configuration is discussed [here](https://github.com/swift-quic/swift-quic/discussions/6)
 - The TLS Handshake uses a slightly modified version of `swift-nio-ssl` available [here](https://github.com/btoms20/swift-nio-ssl)
 - The main connection logic is handled in the `read` and `write` methods of the [Client](https://github.com/swift-quic/swift-quic/blob/develop/Sources/Quic/NIO/Connection/Handlers/ClientHandler.swift) and [Server](https://github.com/swift-quic/swift-quic/blob/develop/Sources/Quic/NIO/Connection/Handlers/ServerHandler.swift) Handlers for the time being (these will eventually be merged into a more generalized StateHandler). 
