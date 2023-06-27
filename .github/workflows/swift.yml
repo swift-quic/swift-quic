@@ -1,4 +1,4 @@
-# This workflow will build a Swift project
+# This workflow will build and test a Swift project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
 
 name: Swift
@@ -15,7 +15,7 @@ on:
 
 jobs:
   build-macos:
-    name: Swift build and test
+    name: macOS build and test
     runs-on: macos-latest
 
     steps:
