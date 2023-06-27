@@ -150,9 +150,9 @@ extension ByteBuffer {
     public mutating func readQuicCryptoFrame() -> [UInt8]? {
         guard self.getBytes(at: self.readerIndex, length: 1) == [0x06] else { print("ReadQuicCryptoFrame::Invalid Frame Type"); return nil }
         guard let offset = self.getQuicVarInt(at: self.readerIndex + 1) else { print("ReadQuicCryptoFrame::Failed to get Offset"); return nil }
-        print("QuicCryptoFrame::Offset Bytes \(offset.length)")
+        //print("QuicCryptoFrame::Offset Bytes \(offset.length)")
         guard let length = self.getQuicVarInt(at: self.readerIndex + offset.length + 1) else { print("ReadQuicCryptoFrame::Failed to get Length"); return nil }
-        print("QuicCryptoFrame::Length Bytes \(length.length)")
+        //print("QuicCryptoFrame::Length Bytes \(length.length)")
         let bytesToConsume = 1 + offset.length + length.length + Int(length.value)
         guard let result = self.getBytes(at: self.readerIndex, length: bytesToConsume) else {
             print("QuicCryptoFrame::Not enough bytes available")
@@ -165,9 +165,9 @@ extension ByteBuffer {
     public mutating func readQuicCryptoFrameContents() -> [UInt8]? {
         guard self.getBytes(at: self.readerIndex, length: 1) == [0x06] else { return nil }
         guard let offset = self.getQuicVarInt(at: self.readerIndex + 1) else { return nil }
-        print("QuicCryptoFrame::Offset Bytes \(offset.length)")
+        //print("QuicCryptoFrame::Offset Bytes \(offset.length)")
         guard let length = self.getQuicVarInt(at: self.readerIndex + offset.length + 1) else { return nil }
-        print("QuicCryptoFrame::Length Bytes \(length.length)")
+        //print("QuicCryptoFrame::Length Bytes \(length.length)")
         let frameHeaderLength = 1 + offset.length + length.length
         let framePayloadLength = Int(length.value)
         guard let result = self.getBytes(at: self.readerIndex + frameHeaderLength, length: framePayloadLength) else {
@@ -303,9 +303,9 @@ extension ByteBuffer {
             guard let bytes = self.getBytes(at: self.readerIndex, length: totalPacketLength) else { print("Not Enough Bytes Available"); return nil }
 
             let opened = try keys.open(bytes: bytes, packetNumberOffset: pno)
-            print("Decrypted HandshakePacket")
-            print("Header: \(opened.header.hexString)")
-            print("Payload: \(opened.payload.hexString)")
+            //print("Decrypted HandshakePacket")
+            //print("Header: \(opened.header.hexString)")
+            //print("Payload: \(opened.payload.hexString)")
             var headerBuf = ByteBuffer(bytes: opened.header)
             guard let firstByte = headerBuf.readBytes(length: 1)?.first, LongPacketType(rawValue: firstByte & LongPacketType.mask) == .handshake else { print("Not a HandshakePacket"); return nil }
             guard let version = headerBuf.readVersion() else { print("Failed to consume Version from Header"); return nil }
@@ -548,9 +548,9 @@ extension ByteBuffer {
     public func getQuicCryptoFrameContents() -> [UInt8]? {
         guard self.getBytes(at: self.readerIndex, length: 1) == [0x06] else { return nil }
         guard let offset = self.getQuicVarInt(at: self.readerIndex + 1) else { return nil }
-        print("QuicCryptoFrame::Offset Bytes \(offset.length)")
+        //print("QuicCryptoFrame::Offset Bytes \(offset.length)")
         guard let length = self.getQuicVarInt(at: self.readerIndex + offset.length + 1) else { return nil }
-        print("QuicCryptoFrame::Length Bytes \(length.length)")
+        //print("QuicCryptoFrame::Length Bytes \(length.length)")
         let frameHeaderLength = 1 + offset.length + length.length
         let framePayloadLength = Int(length.value)
         guard let result = self.getBytes(at: self.readerIndex + frameHeaderLength, length: framePayloadLength) else {
