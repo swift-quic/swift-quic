@@ -43,7 +43,7 @@ struct VersionNegotiationPacket: Packet {
         self.versions = supportedVersions
     }
 
-    var payload: [Frame] {
+    var payload: [any Frame] {
         return self.versions.map { version in
             Frames.Raw(bytes: version.withUnsafeBytes { Array($0) })
         }

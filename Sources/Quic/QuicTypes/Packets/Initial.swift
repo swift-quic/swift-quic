@@ -67,7 +67,7 @@ struct InitialHeader: TypedHeader, NumberedHeader {
 
 struct InitialPacket: Packet, NumberedPacket {
     var header: InitialHeader
-    var payload: [Frame] {
+    var payload: [any Frame] {
         didSet {
             let tagLength = 16
             self.header.setPacketLength(UInt64(serializedPayload.count + tagLength + self.header.packetNumber.count))
@@ -76,7 +76,7 @@ struct InitialPacket: Packet, NumberedPacket {
 
     var packetNumber: [UInt8] { self.header.packetNumber }
 
-    init(header: InitialHeader, payload: [Frame]) {
+    init(header: InitialHeader, payload: [any Frame]) {
         self.header = header
         self.payload = payload
         // Make sure to propagate the payload length to the header
