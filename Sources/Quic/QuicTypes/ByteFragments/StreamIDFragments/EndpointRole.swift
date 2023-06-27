@@ -9,3 +9,12 @@ enum EndpointRole: UInt8 {
 extension EndpointRole: ByteFragment {
   static let mask: UInt8 = 1
 }
+
+extension EndpointRole {
+    var opposite:EndpointRole {
+        switch self {
+        case .client: return .server
+        case .server: return .client
+        }
+    }
+}
