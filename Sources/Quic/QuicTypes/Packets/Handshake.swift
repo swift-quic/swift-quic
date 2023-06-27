@@ -61,14 +61,14 @@ struct HandshakeHeader: TypedHeader, NumberedHeader {
 
 struct HandshakePacket: Packet, NumberedPacket {
     var header: HandshakeHeader
-    var payload: [Frame] {
+    var payload: [any Frame] {
         didSet {
             let tagLength = 16
             self.header.setPacketLength(UInt64(serializedPayload.count + tagLength + self.header.packetNumber.count))
         }
     }
 
-    init(header: HandshakeHeader, payload: [Frame]) {
+    init(header: HandshakeHeader, payload: [any Frame]) {
         self.header = header
         self.payload = payload
 
