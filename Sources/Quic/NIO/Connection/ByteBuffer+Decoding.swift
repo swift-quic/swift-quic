@@ -143,6 +143,12 @@ extension ByteBuffer {
 }
 
 extension ByteBuffer {
+    public enum ReadResult {
+        case invalidFrame
+        case needMoreData
+        case success([UInt8])
+    }
+    
     /// Attempts to consume a Quic Crypto Frame and returns the bytes upon success
     ///
     /// - returns: A `[UInt8]` value containing the `CryptoFrame`s bytes or `nil` if there wasn't a valid frame available.
@@ -181,29 +187,35 @@ extension ByteBuffer {
     ///
     /// - returns: A `[UInt8]` value containing the `TLS ServerHello`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public mutating func readTLSServerHello() -> [UInt8]? {
-        guard let serverHello = self.getTLSServerHello() else { return nil }
-        self.moveReaderIndex(forwardBy: serverHello.count)
-        return serverHello
+    public mutating func readTLSClientHello() -> ReadResult {
+        let result = self.getTLSClientHello()
+        if case .success(let clientHello) = result {
+            self.moveReaderIndex(forwardBy: clientHello.count)
+        }
+        return result
     }
-
+    
     /// Attempts to consume a TLS ServerHello Frame and returns the bytes upon success
     ///
     /// - returns: A `[UInt8]` value containing the `TLS ServerHello`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public mutating func readTLSClientHello() -> [UInt8]? {
-        guard let clientHello = self.getTLSClientHello() else { return nil }
-        self.moveReaderIndex(forwardBy: clientHello.count)
-        return clientHello
+    public mutating func readTLSServerHello() -> ReadResult {
+        let result = self.getTLSServerHello()
+        if case .success(let serverHello) = result {
+            self.moveReaderIndex(forwardBy: serverHello.count)
+        }
+        return result
     }
 
     /// Attempts to consume a TLS Encrypted Extensions Frame and returns the bytes upon success
     ///
     /// - returns: A `[UInt8]` value containing the `TLS Encrypted Extension`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public mutating func readTLSEncryptedExtensions() -> [UInt8]? {
-        guard let result = self.getTLSEncryptedExtensions() else { return nil }
-        self.moveReaderIndex(forwardBy: result.count)
+    public mutating func readTLSEncryptedExtensions() -> ReadResult {
+        let result = self.getTLSEncryptedExtensions()
+        if case .success(let encryptedExtensions) = result {
+            self.moveReaderIndex(forwardBy: encryptedExtensions.count)
+        }
         return result
     }
 
@@ -211,9 +223,11 @@ extension ByteBuffer {
     ///
     /// - returns: A `[UInt8]` value containing the `TLS Certificate`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public mutating func readTLSCertificate() -> [UInt8]? {
-        guard let result = self.getTLSCertificate() else { return nil }
-        self.moveReaderIndex(forwardBy: result.count)
+    public mutating func readTLSCertificate() -> ReadResult {
+        let result = self.getTLSCertificate()
+        if case .success(let certificate) = result {
+            self.moveReaderIndex(forwardBy: certificate.count)
+        }
         return result
     }
 
@@ -221,9 +235,11 @@ extension ByteBuffer {
     ///
     /// - returns: A `[UInt8]` value containing the `TLS Certificate Verify`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public mutating func readTLSCertificateVerify() -> [UInt8]? {
-        guard let result = self.getTLSCertificateVerify() else { return nil }
-        self.moveReaderIndex(forwardBy: result.count)
+    public mutating func readTLSCertificateVerify() -> ReadResult {
+        let result = self.getTLSCertificateVerify()
+        if case .success(let certVerify) = result {
+            self.moveReaderIndex(forwardBy: certVerify.count)
+        }
         return result
     }
 
@@ -231,9 +247,11 @@ extension ByteBuffer {
     ///
     /// - returns: A `[UInt8]` value containing the `TLS Certificate Verify`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public mutating func readTLSHandshakeFinished() -> [UInt8]? {
-        guard let result = self.getTLSHandshakeFinished() else { return nil }
-        self.moveReaderIndex(forwardBy: result.count)
+    public mutating func readTLSHandshakeFinished() -> ReadResult {
+        let result = self.getTLSHandshakeFinished()
+        if case .success(let finished) = result {
+            self.moveReaderIndex(forwardBy: finished.count)
+        }
         return result
     }
 
@@ -435,14 +453,14 @@ extension ByteBuffer {
     ///
     /// - returns: A `[UInt8]` value containing the `TLS ClientHello`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public func getTLSClientHello() -> [UInt8]? {
-        guard self.getBytes(at: self.readerIndex, length: 2) == [0x01, 0x00] else { return nil }
-        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return nil }
+    public func getTLSClientHello() -> ReadResult {
+        guard self.getBytes(at: self.readerIndex, length: 2) == [0x01, 0x00] else { return .invalidFrame }
+        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return .invalidFrame }
         let bytesToConsume = 4 + Int(length)
         guard let result = self.getBytes(at: self.readerIndex, length: bytesToConsume) else {
-            return nil
+            return .needMoreData
         }
-        return result
+        return .success(result)
     }
 
     public func getTLSClientHelloSlice() -> ByteBuffer? {
@@ -459,14 +477,14 @@ extension ByteBuffer {
     ///
     /// - returns: A `[UInt8]` value containing the `TLS ServerHello`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public func getTLSServerHello() -> [UInt8]? {
-        guard self.getBytes(at: self.readerIndex, length: 2) == [0x02, 0x00] else { return nil }
-        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return nil }
+    public func getTLSServerHello() -> ReadResult {
+        guard self.getBytes(at: self.readerIndex, length: 2) == [0x02, 0x00] else { return .invalidFrame }
+        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return .invalidFrame }
         let bytesToConsume = 4 + Int(length)
         guard let result = self.getBytes(at: self.readerIndex, length: bytesToConsume) else {
-            return nil
+            return .needMoreData
         }
-        return result
+        return .success(result)
     }
 
     public func getTLSServerHelloSlice() -> ByteBuffer? {
@@ -483,14 +501,14 @@ extension ByteBuffer {
     ///
     /// - returns: A `[UInt8]` value containing the `TLS Encrypted Extension`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public func getTLSEncryptedExtensions() -> [UInt8]? {
-        guard self.getBytes(at: self.readerIndex, length: 2) == [0x08, 0x00] else { return nil }
-        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return nil }
+    public func getTLSEncryptedExtensions() -> ReadResult {
+        guard self.getBytes(at: self.readerIndex, length: 2) == [0x08, 0x00] else { return .invalidFrame }
+        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return .invalidFrame }
         let bytesToConsume = 4 + Int(length)
         guard let result = self.getBytes(at: self.readerIndex, length: bytesToConsume) else {
-            return nil
+            return .needMoreData
         }
-        return result
+        return .success(result)
     }
 
     public func getTLSEncryptedExtensionsSlice() -> ByteBuffer? {
@@ -507,42 +525,42 @@ extension ByteBuffer {
     ///
     /// - returns: A `[UInt8]` value containing the `TLS Certificate`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public func getTLSCertificate() -> [UInt8]? {
-        guard self.getBytes(at: self.readerIndex, length: 2) == [0x0b, 0x00] else { return nil }
-        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return nil }
+    public func getTLSCertificate() -> ReadResult {
+        guard self.getBytes(at: self.readerIndex, length: 2) == [0x0b, 0x00] else { return .invalidFrame }
+        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return .invalidFrame }
         let bytesToConsume = 4 + Int(length)
         guard let result = self.getBytes(at: self.readerIndex, length: bytesToConsume) else {
-            return nil
+            return .needMoreData
         }
-        return result
+        return .success(result)
     }
 
     /// Attempts to consume a TLS Certificate Verify Frame and returns the bytes upon success
     ///
     /// - returns: A `[UInt8]` value containing the `TLS Certificate Verify`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public func getTLSCertificateVerify() -> [UInt8]? {
-        guard self.getBytes(at: self.readerIndex, length: 2) == [0x0f, 0x00] else { return nil }
-        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return nil }
+    public func getTLSCertificateVerify() -> ReadResult {
+        guard self.getBytes(at: self.readerIndex, length: 2) == [0x0f, 0x00] else { return .invalidFrame }
+        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return .invalidFrame }
         let bytesToConsume = 4 + Int(length)
         guard let result = self.getBytes(at: self.readerIndex, length: bytesToConsume) else {
-            return nil
+            return .needMoreData
         }
-        return result
+        return .success(result)
     }
 
     /// Attempts to consume a TLS Certificate Verify Frame and returns the bytes upon success
     ///
     /// - returns: A `[UInt8]` value containing the `TLS Certificate Verify`s bytes or `nil` if there wasn't a valid frame available.
     //@inlinable
-    public func getTLSHandshakeFinished() -> [UInt8]? {
-        guard self.getBytes(at: self.readerIndex, length: 2) == [0x14, 0x00] else { return nil }
-        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return nil }
+    public func getTLSHandshakeFinished() -> ReadResult {
+        guard self.getBytes(at: self.readerIndex, length: 2) == [0x14, 0x00] else { return .invalidFrame }
+        guard let length = self.getInteger(at: self.readerIndex + 2, as: UInt16.self) else { return .invalidFrame }
         let bytesToConsume = 4 + Int(length)
         guard let result = self.getBytes(at: self.readerIndex, length: bytesToConsume) else {
-            return nil
+            return .needMoreData
         }
-        return result
+        return .success(result)
     }
 
     public func getQuicCryptoFrameContents() -> [UInt8]? {
@@ -1062,9 +1080,9 @@ extension ByteBuffer {
 
 extension ByteBuffer {
 
-    internal mutating func parsePayloadIntoFrames() throws -> (frames: [Frame], leftoverBytes: ByteBuffer?) {
-        let result = self.rewindReaderOnNil { `self` -> (frames: [Frame], leftoverBytes: ByteBuffer?)? in
-            var frames: [Frame] = []
+    internal mutating func parsePayloadIntoFrames() throws -> (frames: [any Frame], leftoverBytes: ByteBuffer?) {
+        let result = self.rewindReaderOnNil { `self` -> (frames: [any Frame], leftoverBytes: ByteBuffer?)? in
+            var frames: [any Frame] = []
             var leftoverBytes: ByteBuffer?
 
             readLoop: while self.readableBytes > 0 {
@@ -1149,9 +1167,9 @@ extension ByteBuffer {
 }
 
 extension Array where Element == UInt8 {
-    internal func parsePayloadIntoFrames() throws -> (frames: [Frame], leftoverBytes: [UInt8]?) {
+    internal func parsePayloadIntoFrames() throws -> (frames: [any Frame], leftoverBytes: [UInt8]?) {
         var buf = ByteBuffer(bytes: self)
-        var res = try buf.parsePayloadIntoFrames()
+        let res = try buf.parsePayloadIntoFrames()
         if let leftoverBytes = res.leftoverBytes {
             return (frames: res.frames, leftoverBytes: Array(leftoverBytes.readableBytesView))
         }
