@@ -53,7 +53,7 @@ final class QUICHandshakeTests: XCTestCase {
     let version: Version = .version1
     var dcid: ConnectionID!
     var scid: ConnectionID!
-    fileprivate var quicClientHandler: QUICClientHandler!
+    fileprivate var quicClientHandler: QUICStateHandler!
     fileprivate var clientErrorHandler: ErrorEventLogger!
     fileprivate var clientTLSHandler: NIOSSLClientHandler!
     fileprivate var clientQuiesceEventRecorder: QuiesceEventRecorder!
@@ -136,7 +136,7 @@ final class QUICHandshakeTests: XCTestCase {
         let sslClientContext = try! NIOSSLContext(configuration: configuration)
 
         // Client QUIC State Handler
-        let clientHandler = try! QUICClientHandler(SocketAddress(ipAddress: "127.0.0.1", port: 0), version: self.version, destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext)
+        let clientHandler = try! QUICStateHandler(SocketAddress(ipAddress: "127.0.0.1", port: 0), perspective: .client, version: self.version, destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext)
 
         // Configure Server TLS
         var serverConfiguration = TLSConfiguration.makeServerConfiguration(
@@ -200,7 +200,7 @@ final class QUICHandshakeTests: XCTestCase {
     /// Takes about 5ms to generate a Client InitialPacket
     func testHandshake() throws {
         throw XCTSkip("This integration test is skipped by default")
-        
+
         // This is set to v1.2 for historical reasons, v1.3 (which will be enforced) is specified in the `tls version` within the client hello
         XCTAssertEqual(self.clientTLSHandler.tlsVersion, NIOSSL.TLSVersion.tlsv12)
 
@@ -265,7 +265,7 @@ final class QUICHandshakeTests: XCTestCase {
     /// Takes about 5ms to generate a Client InitialPacket
     func testHandshake2() throws {
         throw XCTSkip("This integration test is skipped by default")
-        
+
         try self.backToBack.interactInMemory()
 
         print("Done???")
