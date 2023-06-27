@@ -81,7 +81,7 @@ import XCTest
 /// 3) Build the executable
 /// 4) Run this test
 /// 5) Execute the Go code
-///
+/// - Note: Make sure to comment out / remove the XCTSkip line in the test before running it
 final class QUICExternalDialServerTests: XCTestCase {
     var group: MultiThreadedEventLoopGroup!
     var server: DatagramBootstrap!
@@ -194,7 +194,7 @@ final class QUICExternalDialServerTests: XCTestCase {
     /// Takes about 5ms to generate a Client InitialPacket
     func testHandshake() throws {
         throw XCTSkip("This integration test is skipped by default")
-        
+
         // Bind to our UDP port (this activates the Handlers and kicks off a connection)
         self.channel = try! self.server.bind(host: "127.0.0.1", port: 4242).wait()
 
