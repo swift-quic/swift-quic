@@ -15,25 +15,57 @@
 import Atomics
 import NIOCore
 
+/// - Note: This StreamStateHandler is more of an Echo placeholder handler at the moment
 final class StreamStateHandler: ChannelInboundHandler {
     public typealias InboundIn = ByteBuffer
     public typealias OutboundOut = ByteBuffer
 
     func handlerAdded(context: ChannelHandlerContext) {
         print("StreamStateHandler::Added")
-        if let chan = context.channel as? QuicStreamChannel {
-            print("Got our StreamID::\(chan.streamID)")
-        }
     }
 
     func handlerRemoved(context: ChannelHandlerContext) {
         print("StreamStateHandler::Removed")
     }
 
+    public func channelActive(context: ChannelHandlerContext) {
+        print("StreamStateHandler::ChannelActive")
+        if let chan = context.channel as? QuicStreamChannel {
+            print("Got our StreamID::\(chan.streamID)")
+            if context.channel.isActive, chan.perspective == .client {
+                print("Attempting to open Stream as Client")
+                let messageToSend = "Hello from swift-quic!"
+                let newStream = Frames.Stream(streamID: StreamID(rawValue: VarInt(integerLiteral: 0)), offset: VarInt(integerLiteral: 0), length: VarInt(integerLiteral: UInt64(messageToSend.count)), fin: true, data: ByteBuffer(string: messageToSend))
+                var buffer = ByteBuffer()
+                newStream.encode(into: &buffer)
+                let _ = context.writeAndFlush(self.wrapOutboundOut(buffer)).always { res in
+                    print("Sent our message to be echoed!")
+                }
+            }
+        }
+    }
+
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         print("StreamStateHandler::ChannelRead")
         let buf = self.unwrapInboundIn(data)
-        print("StreamStateHandler::Got Message `\(buf.getString(at: buf.readerIndex, length: buf.readableBytes) ?? "")`")
+
+        guard let chan = context.channel as? QuicStreamChannel else { return }
+
+        // If we're acting as a Client and we receive our message back, close the channel
+        // Else if we're acting as a Server, echo any data we receive back to the Client
+        switch chan.perspective {
+            case .client:
+                print("StreamStateHandler::Got Message `\(buf.getString(at: buf.readerIndex, length: buf.readableBytes) ?? "")`")
+                // Close our channel
+                context.close(mode: .all, promise: nil)
+                // Ask our parent channel to close
+                context.channel.parent?.close(mode: .all, promise: nil)
+            case .server:
+                print("StreamStateHandler::Echoing Message `\(buf.getString(at: buf.readerIndex, length: buf.readableBytes) ?? "")`")
+                _ = context.writeAndFlush(self.wrapOutboundOut(buf)).always { res in
+                    print("Echoed Message!")
+                }
+        }
     }
 
     public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
@@ -68,9 +100,11 @@ final class QuicStreamMultiplexer: ChannelInboundHandler, ChannelOutboundHandler
     private var context: ChannelHandlerContext!
     private var didReadChannels: StreamChannelList = StreamChannelList()
     private var flushState: FlushState = .notReading
+    let perspective: EndpointRole
 
-    public init(channel: Channel, inboundStreamInitializer initializer: ((Channel) -> EventLoopFuture<Void>)?) {
+    public init(channel: Channel, perspective: EndpointRole, inboundStreamInitializer initializer: ((Channel) -> EventLoopFuture<Void>)?) {
         self.channel = channel
+        self.perspective = perspective
         self.inboundStreamStateInitializer = initializer
     }
 
@@ -80,13 +114,15 @@ final class QuicStreamMultiplexer: ChannelInboundHandler, ChannelOutboundHandler
         print("QuicStreamMultiplexer::HandlerAdded")
         self.channel.eventLoop.preconditionInEventLoop()
         self.context = context
-        if self.channel.isActive {
-            print("Attempting to open Stream")
-            let messageToSend = "Hello from swift-quic!"
-            let newStream = Frames.Stream(streamID: StreamID(rawValue: VarInt(integerLiteral: 0)), offset: VarInt(integerLiteral: 0), length: VarInt(integerLiteral: UInt64(messageToSend.count)), fin: true, data: ByteBuffer(string: messageToSend))
-            var buffer = ByteBuffer()
-            newStream.encode(into: &buffer)
-            self.context.writeAndFlush(self.wrapOutboundOut(buffer), promise: nil)
+
+        // If we're a Client open / instantiate a new Stream immediately
+        if self.perspective == .client {
+            print("Opening new Stream")
+            let id = StreamID(rawValue: 0)
+            let channel = QuicStreamChannel(allocator: self.channel.allocator, parent: self.channel, multiplexer: self, streamID: id)
+            self.streams[id] = channel
+
+            channel.configure(initializer: self.inboundStreamStateInitializer, userPromise: nil)
         }
     }
 
@@ -324,6 +360,10 @@ private final class QuicStreamChannel: Channel, ChannelCore {
     public var isActive: Bool {
 //        return parent!.isActive
         return self._isActiveAtomic.load(ordering: .relaxed)
+    }
+
+    var perspective: EndpointRole {
+        return self.parentMultiplexer.perspective
     }
 
     private let _isActiveAtomic: ManagedAtomic<Bool>
