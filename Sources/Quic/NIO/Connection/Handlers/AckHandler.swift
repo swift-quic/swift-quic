@@ -18,10 +18,18 @@ import NIOCore
 final class ACKChannelHandler: ChannelDuplexHandler {
     public typealias InboundIn = Packet
     public typealias InboundOut = Packet
-    public typealias OutboundOut = [any Packet]
+    public typealias OutboundOut = [any Packet] // This is an array, so we can explicitly coalesce packets within a datagram
     public typealias OutboundIn = [any Packet] // This is an array, so we can explicitly coalesce packets within a datagram
 
     let manager: ACKManager
+
+    struct KeyPhaseDatum {
+        let initiator: EndpointRole
+        let initiatedAt: UInt64
+        let largestInFlight: UInt64
+    }
+
+    var previousKeyPhaseDatum: KeyPhaseDatum?
 
     init() {
         self.manager = ACKManager()
@@ -45,6 +53,10 @@ final class ACKChannelHandler: ChannelDuplexHandler {
                         self.manager.process(ack: ack, for: .Handshake)
                     case .Short:
                         self.manager.process(ack: ack, for: .Application)
+                        // Process a key phase update if we have one
+                        if let datum = previousKeyPhaseDatum {
+                            self.checkIfKeyUpdateHasFinished(context: context, datum: datum, packet: numberedPacket)
+                        }
                     default:
                         print("AckChannelHandler::ChannelRead::Unhandled Packet Type \(numberedPacket)")
                 }
@@ -53,13 +65,6 @@ final class ACKChannelHandler: ChannelDuplexHandler {
 
         // Forward the original data along, unaltered
         context.fireChannelRead(data)
-    }
-
-    private func isPacketAckEliciting(_ packet: any NumberedPacket) -> Bool {
-        if packet.payload.count == 1, let onlyFrame = packet.payload.first {
-            if onlyFrame as? Frames.ACK != nil { return false }
-        }
-        return true
     }
 
     public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
@@ -121,7 +126,68 @@ final class ACKChannelHandler: ChannelDuplexHandler {
         context.write(self.wrapOutboundOut(packets), promise: promise)
     }
 
-    public func flushPendingACKs(context: ChannelHandlerContext, promise: EventLoopPromise<Void>?) {
+    /// Listen for Inbound User Events
+    /// Specifically we're listening for KeyUpdateInitiated Events
+    ///     - We react to these events by recording a datum / marker that keeps track of in-flight packets at the time of the key update
+    ///     - We use this datum to ensure that all in-flight packets have been acknowledged before dropping the keys from the previous phase
+    public func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        if let keyUpdateInitiatedMessage = event as? ConnectionChannelEvent.KeyUpdateInitiated {
+            print("AckChannelHandler::UserInboundEventTriggered::TODO::Got our key update initiated message!")
+            print(keyUpdateInitiatedMessage)
+            guard self.previousKeyPhaseDatum == nil else {
+                print("Can't initiate key phase update while an existing update is taking place!")
+                return
+            }
+            self.previousKeyPhaseDatum = KeyPhaseDatum(
+                initiator: keyUpdateInitiatedMessage.initiator,
+                initiatedAt: keyUpdateInitiatedMessage.packetNumber,
+                largestInFlight: keyUpdateInitiatedMessage.initiator == .client ? self.manager.traffic.largestSent : self.manager.traffic.largestReceived
+            )
+        }
+        // Pass it along, so our state handler can pick it up as well
+        context.fireUserInboundEventTriggered(event)
+    }
+
+    //public func flushPendingACKs(context: ChannelHandlerContext, promise: EventLoopPromise<Void>?) {
+    //
+    //}
+
+    private func isPacketAckEliciting(_ packet: any NumberedPacket) -> Bool {
+        if packet.payload.count == 1, let onlyFrame = packet.payload.first {
+            if onlyFrame as? Frames.ACK != nil { return false }
+        }
+        return true
+    }
+
+    /// This method compares our acknowledged packets to that of the in progress key update datum
+    /// - Note: We trigger a `KeyUpdateFinished` event once all in-flight packets from the previous phase have been acknowledged
+    private func checkIfKeyUpdateHasFinished(context: ChannelHandlerContext, datum: KeyPhaseDatum, packet: any NumberedPacket) {
+        switch datum.initiator {
+            case .client:
+                if let largestSentAcked = self.manager.traffic.largestSentAcked {
+                    if largestSentAcked > datum.largestInFlight {
+                        print("AckChannelHandler::ChannelRead::Key Update Finished")
+                        self.previousKeyPhaseDatum = nil
+                        context.fireUserInboundEventTriggered(
+                            ConnectionChannelEvent.KeyUpdateFinished(
+                                packetNumber: packet.header.packetNumberAsUInt64()
+                            )
+                        )
+                    }
+                }
+            case .server:
+                if let largestRecAcked = self.manager.traffic.largestReceivedAcked {
+                    if largestRecAcked > datum.largestInFlight {
+                        print("AckChannelHandler::ChannelRead::Key Update Finished")
+                        self.previousKeyPhaseDatum = nil
+                        context.fireUserInboundEventTriggered(
+                            ConnectionChannelEvent.KeyUpdateFinished(
+                                packetNumber: packet.header.packetNumberAsUInt64()
+                            )
+                        )
+                    }
+                }
+        }
     }
 }
 
@@ -187,9 +253,8 @@ final class ACKHandler {
     }
 
     func processReceivedPacketNumber(_ pn: [UInt8], isAckEliciting: Bool) {
-        var packetNumber = pn.drop(while: { $0 == 0 })
-        if packetNumber.isEmpty { packetNumber = [0x00] }
-        guard let num = packetNumber.readQuicVarInt()?.value else { fatalError("Unable to read PacketNumber \(pn) -> \(packetNumber)") }
+        let packetNumber = Array<UInt8>(repeating: 0, count: 8 - pn.count) + pn
+        let num = UInt64(bytes: packetNumber.reversed())
         if self.largestReceived == nil { self.largestReceived = num }
         else if self.largestReceived < num {
             self.largestReceived = num
