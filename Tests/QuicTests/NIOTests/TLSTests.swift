@@ -25,7 +25,6 @@ final class TLSClientInitialTests: XCTestCase {
     var scid: ConnectionID!
     fileprivate var quicClientHandler: QUICStateHandler!
     fileprivate var errorHandler: ErrorEventLogger!
-    fileprivate var tlsHandler: NIOSSLClientHandler!
     fileprivate var quiesceEventRecorder: QuiesceEventRecorder!
 
     var expectedQuicParams: [UInt8] = []
@@ -46,11 +45,9 @@ final class TLSClientInitialTests: XCTestCase {
 
         self.channel = EmbeddedChannel()
         self.quicClientHandler = try! QUICStateHandler(SocketAddress(ipAddress: "127.0.0.1", port: 0), perspective: .client, version: self.version, destinationID: self.dcid, sourceID: self.scid, tlsContext: sslContext)
-        self.tlsHandler = try! NIOSSLClientHandler(context: sslContext, serverHostname: nil)
         self.quiesceEventRecorder = QuiesceEventRecorder()
         self.errorHandler = ErrorEventLogger()
         XCTAssertNoThrow(try self.channel.pipeline.addHandler(self.quicClientHandler).wait())
-        XCTAssertNoThrow(try self.channel.pipeline.addHandler(self.tlsHandler).wait())
         XCTAssertNoThrow(try self.channel.pipeline.addHandler(self.errorHandler).wait())
         XCTAssertNoThrow(try self.channel.pipeline.addHandler(self.quiesceEventRecorder).wait())
 
@@ -65,15 +62,12 @@ final class TLSClientInitialTests: XCTestCase {
         }
         self.clientInitialBytes = nil
         self.quicClientHandler = nil
-        self.tlsHandler = nil
         self.quiesceEventRecorder = nil
     }
 
     /// This test asserts that when we initialize a QUIC Client Channel, BoringSSL generates and write the client hello crypto frame upon channel activation.
     /// Takes about 5ms to generate a Client InitialPacket
     func testGenerateClientHello() throws {
-        // This is set to v1.2 for historical reasons, v1.3 (which will be enforced) is specified in the `tls version` within the client hello
-        XCTAssertEqual(self.tlsHandler.tlsVersion, NIOSSL.TLSVersion.tlsv12)
         self.expectedQuicParams = self.quicClientHandler.ourParams
         let addressedEnvelope = try self.channel.readOutbound(as: AddressedEnvelope<ByteBuffer>.self)
         self.clientInitialBytes = addressedEnvelope?.data
