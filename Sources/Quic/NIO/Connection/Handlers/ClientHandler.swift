@@ -383,7 +383,7 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
 
                         // Install our StreamMultiplexer on our pipeline to handle stream frames
                         try! context.pipeline.syncOperations.addHandler(
-                            QuicStreamMultiplexer(channel: context.channel, inboundStreamInitializer: { streamChannel in
+                            QuicStreamMultiplexer(channel: context.channel, perspective: .client, inboundStreamInitializer: { streamChannel in
                                 streamChannel.pipeline.addHandler(StreamStateHandler())
                             }),
                             position: .after(self)
@@ -465,7 +465,7 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
 
                             // Install our StreamMultiplexer on our pipeline to handle stream frames
                             try! context.pipeline.syncOperations.addHandler(
-                                QuicStreamMultiplexer(channel: context.channel, inboundStreamInitializer: { streamChannel in
+                                QuicStreamMultiplexer(channel: context.channel, perspective: .client, inboundStreamInitializer: { streamChannel in
                                     streamChannel.pipeline.addHandler(StreamStateHandler())
                                 }),
                                 position: .after(self)

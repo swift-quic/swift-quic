@@ -237,7 +237,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
 
                                 // Install our StreamMultiplexer on our pipeline to handle stream frames
                                 try! context.pipeline.syncOperations.addHandler(
-                                    QuicStreamMultiplexer(channel: context.channel, inboundStreamInitializer: { streamChannel in
+                                    QuicStreamMultiplexer(channel: context.channel, perspective: .server, inboundStreamInitializer: { streamChannel in
                                         streamChannel.pipeline.addHandler(StreamStateHandler())
                                     }),
                                     position: .after(self)
