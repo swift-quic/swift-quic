@@ -33,6 +33,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
 
     let mode: EndpointRole = .server
     let version: Quic.Version
+    var didSendHandshakeDone: Bool = false
 
     var retiredDCIDs: [ConnectionID] = []
     var dcid: Quic.ConnectionID {
@@ -122,8 +123,8 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
         self.ourTransportParams.initial_max_stream_data_bidi_local = 524_288
         self.ourTransportParams.initial_max_stream_data_bidi_remote = 524_288
         self.ourTransportParams.initial_max_stream_data_uni = 524_288
-        self.ourTransportParams.initial_max_streams_bidi = 100
-        self.ourTransportParams.initial_max_streams_uni = 100
+        self.ourTransportParams.initial_max_streams_bidi = 1010
+        self.ourTransportParams.initial_max_streams_uni = 1010
         //self.transportParams.ack_delay_exponent = 3
         //self.transportParams.max_ack_delay = 26
         //self.transportParams.disable_active_migration = true
@@ -259,13 +260,9 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                 // This should be a stream frame
                 guard let traffic = packet as? ShortPacket else { print("Expected Traffic Packet, didn't get it"); return }
                 if let streamFrame = traffic.payload.first(where: { ($0 as? Frames.Stream) != nil }) as? Frames.Stream {
-                    print("Got a Stream Frame")
-                    let echoPacket = ShortPacket(
-                        header: GenericShortHeader(firstByte: 0b01000001, id: self.dcid, packetNumber: []),
-                        payload: [Frames.HandshakeDone(), streamFrame]
-                    )
-                    // Echo the stream frame
-                    context.write(self.wrapOutboundOut([echoPacket]), promise: nil)
+                    var streamBuffer = ByteBuffer()
+                    streamFrame.encode(into: &streamBuffer)
+                    context.fireChannelRead(self.wrapInboundOut(streamBuffer))
                 }
 
             case .receivedDisconnect:
@@ -367,6 +364,25 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                 }
             case .active:
                 print("QUICServerHandler::Write::TODO:Handle Short / Traffic Packets")
+                if !self.didSendHandshakeDone {
+                    self.didSendHandshakeDone = true
+                    let donePacket = ShortPacket(
+                        header: GenericShortHeader(firstByte: 0b01000001, id: self.dcid, packetNumber: []),
+                        payload: [Frames.HandshakeDone(), Frames.NewToken(token: ConnectionID(randomOfLength: 74).rawValue)]
+                    )
+                    // Echo the stream frame
+                    context.write(self.wrapOutboundOut([donePacket]), promise: nil)
+                }
+
+                if let streamFrame = buffer.readStreamFrame() {
+                    let packet = ShortPacket(
+                        header: GenericShortHeader(firstByte: 0b01000001, id: self.dcid, packetNumber: []),
+                        payload: [streamFrame]
+                    )
+                    // Send along the stream frame
+                    context.write(self.wrapOutboundOut([packet]), promise: nil)
+                }
+
             case .receivedDisconnect:
                 print("QUICServerHandler::Write::TODO:Handle Received Disconnect")
             case .sentDisconnect:
@@ -388,5 +404,17 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     public func errorCaught(ctx: ChannelHandlerContext, error: Error) {
         print("QUICServerHandler::ErrorCaught: \(error)")
         ctx.close(promise: nil)
+    }
+
+    public func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        if let keyUpdateInitiatedMessage = event as? ConnectionChannelEvent.KeyUpdateInitiated {
+            print("QUICServerHandler::UserInboundEventTriggered::TODO::Got our key update initiated message!")
+            print(keyUpdateInitiatedMessage)
+        } else if let keyUpdateFinishedMessage = event as? ConnectionChannelEvent.KeyUpdateFinished {
+            print("QUICServerHandler::UserInboundEventTriggered::TODO::Got our key update finished message!")
+            print(keyUpdateFinishedMessage)
+            self.packetProtectorHandler.dropTrafficKeysForPreviousPhase()
+        }
+        // We consume this event. No need to pass it along.
     }
 }
