@@ -159,6 +159,7 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
         print("QUICClientHandler::Added")
         self.storedContext = context
         // Install the PacketProtectorHandler in front of us
+        try! context.pipeline.syncOperations.addHandler(DatagramHandler(remoteAddress: self.remoteAddress), position: .before(self))
         try! context.pipeline.syncOperations.addHandler(self.packetProtectorHandler, position: .before(self))
         try! context.pipeline.syncOperations.addHandler(self.ackHandler, position: .before(self))
         try! context.pipeline.syncOperations.addHandler(self.tlsHandler, position: .after(self))
