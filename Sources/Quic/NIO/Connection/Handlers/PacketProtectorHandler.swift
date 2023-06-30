@@ -19,18 +19,18 @@ final class DatagramHandler: ChannelDuplexHandler {
     public typealias InboundOut = ByteBuffer
     public typealias OutboundIn = ByteBuffer
     public typealias OutboundOut = AddressedEnvelope<ByteBuffer>
-    
+
     private let remoteAddress: SocketAddress
-    
+
     init(remoteAddress: SocketAddress) {
         self.remoteAddress = remoteAddress
     }
-    
+
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let datagram = self.unwrapInboundIn(data)
         context.fireChannelRead(self.wrapInboundOut(datagram.data))
     }
-    
+
     public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         let buffer = self.unwrapOutboundIn(data)
         context.write(self.wrapOutboundOut(AddressedEnvelope(remoteAddress: self.remoteAddress, data: buffer)), promise: promise)
@@ -49,10 +49,71 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
 
     internal var initialKeys: PacketProtector
     internal var handshakeKeys: PacketProtector
-    internal var trafficKeys: PacketProtector
+    internal var trafficKeys: TrafficKeyRing
     private var storedContext: ChannelHandlerContext!
 
     private let remoteAddress: SocketAddress
+
+    /// Traffic Key Ring
+    /// Attempts to handle
+    /// https://datatracker.ietf.org/doc/html/rfc9001#section-6
+    struct TrafficKeyRing {
+        var currentKeyPhase: KeyPhase
+        private(set) var cumulativePhase: UInt64 = 0
+        private var trafficKeysPhase0: PacketProtector
+        private var trafficKeysPhase1: PacketProtector
+
+        init(version: Version) {
+            self.currentKeyPhase = .not
+            self.trafficKeysPhase0 = PacketProtector(epoch: .Application, version: version)
+            self.trafficKeysPhase1 = PacketProtector(epoch: .Application, version: version)
+        }
+
+        var currentKeys: PacketProtector {
+            self.keysFor(self.currentKeyPhase)
+        }
+
+        func keysFor(_ kp: KeyPhase) -> PacketProtector {
+            switch kp {
+                case .not:
+                    return self.trafficKeysPhase0
+                case .yes:
+                    return self.trafficKeysPhase1
+            }
+        }
+
+        mutating func installKeySet(suite: CipherSuite, secret: [UInt8], for mode: EndpointRole, ourPerspective: EndpointRole) throws {
+            guard self.trafficKeysPhase1.opener == nil && self.trafficKeysPhase1.sealer == nil else { print("Can't install KeySets after Key Ring initialization. Use updateKeys() instead."); throw Errors.Crypto(0) }
+            try self.trafficKeysPhase0.installKeySet(suite: suite, secret: secret, for: mode, ourPerspective: ourPerspective)
+        }
+
+        /// This method uses the existing keys to prepare a new set of traffic keys beloging to the new Key Phase.
+        /// This method will throw if the keys from the previous phase haven't been dropped yet.
+        /// Upon generating a new key set for the next key phase, this method will toggle our current traffic key phase and begin using the new keys.
+        mutating func updateKeys() throws {
+            switch self.currentKeyPhase {
+                case .not:
+                    guard self.trafficKeysPhase1.opener == nil && self.trafficKeysPhase1.sealer == nil else { throw Errors.Crypto(0) }
+                    guard self.trafficKeysPhase0.opener != nil && self.trafficKeysPhase0.sealer != nil else { throw Errors.Crypto(0) }
+                    try self.trafficKeysPhase1.updateKeys(using: self.trafficKeysPhase0)
+                case .yes:
+                    guard self.trafficKeysPhase0.opener == nil && self.trafficKeysPhase0.sealer == nil else { throw Errors.Crypto(0) }
+                    guard self.trafficKeysPhase1.opener != nil && self.trafficKeysPhase1.sealer != nil else { throw Errors.Crypto(0) }
+                    try self.trafficKeysPhase0.updateKeys(using: self.trafficKeysPhase1)
+            }
+            self.currentKeyPhase.toggle()
+            self.cumulativePhase += 1
+        }
+
+        public mutating func dropKeysForPreviousPhase() {
+            switch self.currentKeyPhase {
+                case .not:
+                    self.trafficKeysPhase1.dropKeys()
+                case .yes:
+                    self.trafficKeysPhase0.dropKeys()
+            }
+        }
+    }
 
     private var canFlushHandshakeBuffer: Bool = false {
         didSet { if self.canFlushHandshakeBuffer && self.encryptedHandshakeBuffer.readableBytes > 0 && self.handshakeKeys.opener != nil { self.decryptAndFlushHandshakeBuffer() } }
@@ -61,7 +122,7 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
     internal var encryptedHandshakeBuffer: ByteBuffer = ByteBuffer()
 
     private var canFlushTrafficBuffer: Bool = false {
-        didSet { if self.canFlushTrafficBuffer && self.encryptedTrafficBuffer.readableBytes > 0 && self.trafficKeys.opener != nil { self.decryptAndFlushTrafficBuffer() } }
+        didSet { if self.canFlushTrafficBuffer && self.encryptedTrafficBuffer.readableBytes > 0 && self.trafficKeys.currentKeys.opener != nil { self.decryptAndFlushTrafficBuffer() } }
     }
 
     internal var encryptedTrafficBuffer: ByteBuffer = ByteBuffer()
@@ -73,7 +134,7 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
         // Generate Initial Key Sets
         self.initialKeys = try! version.newInitialAEAD(connectionID: dcid, perspective: perspective)
         self.handshakeKeys = PacketProtector(epoch: .Handshake, version: version)
-        self.trafficKeys = PacketProtector(epoch: .Handshake, version: version)
+        self.trafficKeys = TrafficKeyRing(version: version)
     }
 
     public func handlerAdded(context: ChannelHandlerContext) {
@@ -123,12 +184,27 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
                     }
                     packet = p
                 case .Short:
-                    guard self.trafficKeys.opener != nil else {
+                    guard self.trafficKeys.currentKeys.opener != nil else {
                         print("PacketProtectorHandler[\(self.perspective)]::ChannelRead::Traffic Keys Not Available Yet! Buffering Traffic Packet")
                         self.encryptedTrafficBuffer.writeBuffer(&buffer)
                         break
                     }
-                    guard let p = buffer.readEncryptedQuicTrafficPacket(dcid: scid, using: trafficKeys) else {
+                    guard let header = buffer.readEncryptedQuicTrafficHeader(dcid: scid, using: trafficKeys.currentKeys) else {
+                        fatalError("PacketProtectorHandler[\(self.perspective)]::ChannelRead::Failed to decrypt traffic packet")
+                    }
+
+                    guard let keyPhase = KeyPhase(rawValue: header.firstByte & KeyPhase.mask) else {
+                        fatalError("PacketProtectorHandler[\(self.perspective)]::ChannelRead::Failed to determine traffic packet key phase")
+                    }
+
+                    if keyPhase != self.trafficKeys.currentKeyPhase {
+                        // TODO: Keep track of Key Phase packet number and drop previous keys once all existing packets have been acknowledged
+                        print("PacketProtectorHandler[\(self.perspective)]::Attempting to update Keys 🔐")
+                        try! self.trafficKeys.updateKeys()
+                        context.fireUserInboundEventTriggered(ConnectionChannelEvent.KeyUpdateInitiated(packetNumber: header.packetNumberAsUInt64(), initiator: self.perspective.opposite))
+                    }
+
+                    guard let p = buffer.readEncryptedQuicTrafficPayload(header: header, using: trafficKeys.keysFor(keyPhase)) else {
                         fatalError("PacketProtectorHandler[\(self.perspective)]::ChannelRead::Failed to decrypt traffic packet")
                     }
                     packet = p
@@ -169,7 +245,7 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
                 print("PacketProtectionHandler[\(self.perspective)]::Write::Dropping Empty Packet")
                 return
             }
-            
+
             do {
                 let enc: (protectedHeader: [UInt8], encryptedPayload: [UInt8])
                 switch PacketType(packet.header.firstByte) {
@@ -178,7 +254,9 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
                     case .Handshake:
                         enc = try (packet as! HandshakePacket).seal(using: self.handshakeKeys)
                     case .Short:
-                        enc = try (packet as! ShortPacket).seal(using: self.trafficKeys)
+                        var short = packet as! ShortPacket
+                        short.header.setKeyPhaseBit(self.trafficKeys.currentKeyPhase)
+                        enc = try (short).seal(using: self.trafficKeys.currentKeys)
                     default:
                         context.fireErrorCaught(Errors.InvalidPacket)
                         fatalError("PacketProtectorhandler[\(self.perspective)]::Write::Handle Packet Type \(PacketType(packet.header.firstByte)!)")
@@ -189,7 +267,7 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
                 fatalError("PacketProtectorhandler[\(self.perspective)]::Failed to encrypt packet `\(error)`")
             }
         }
-        
+
         guard datagramPayload.readableBytes > 0 else {
             promise?.succeed()
             return
@@ -214,6 +292,7 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
                 self.decryptAndFlushHandshakeBuffer()
             }
         } catch {
+            print("PacketProtectorHandler[\(self.perspective)]::Error Caught::\(error)")
             self.storedContext.fireErrorCaught(error)
         }
     }
@@ -227,11 +306,14 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
         // Install the keys
         do {
             try self.trafficKeys.installKeySet(suite: cipherSuite, secret: secret, for: mode, ourPerspective: self.perspective)
+            print(self.trafficKeys)
+            print(self.trafficKeys.currentKeys)
             if self.canFlushTrafficBuffer && mode != self.perspective {
                 print("PacketProtectorHandler[\(self.perspective)]::InstallTrafficKeys::Attempting to Read Buffered Traffic Packets...")
                 self.decryptAndFlushTrafficBuffer()
             }
         } catch {
+            print("PacketProtectorHandler[\(self.perspective)]::Error Caught::\(error)")
             self.storedContext.fireErrorCaught(error)
         }
     }
@@ -254,6 +336,19 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
         self.handshakeKeys.dropKeys()
     }
 
+    public func dropTrafficKeysForPreviousPhase() {
+        self.trafficKeys.dropKeysForPreviousPhase()
+    }
+
+    public func initiateKeyUpdate(at pn: UInt64) {
+        do {
+            try self.trafficKeys.updateKeys()
+            self.storedContext.fireUserInboundEventTriggered(ConnectionChannelEvent.KeyUpdateInitiated(packetNumber: pn, initiator: self.perspective))
+        } catch {
+            print("PacketProtectorHandler[\(self.perspective)]::Failed to Initiate Key Update -> \(error)")
+        }
+    }
+
     private func decryptAndFlushHandshakeBuffer() {
         print("PacketProtectorHandler[\(self.perspective)]::DecryptAndFlushHandshakeBuffer")
         while self.encryptedHandshakeBuffer.readableBytes > 0 {
@@ -270,7 +365,7 @@ final class PacketProtectorHandler: ChannelDuplexHandler {
     private func decryptAndFlushTrafficBuffer() {
         print("PacketProtectorHandler[\(self.perspective)]::DecryptAndFlushTrafficBuffer")
         while self.encryptedTrafficBuffer.readableBytes > 0 {
-            guard let packet = encryptedTrafficBuffer.readEncryptedQuicTrafficPacket(dcid: self.scid, using: self.trafficKeys) else {
+            guard let packet = encryptedTrafficBuffer.readEncryptedQuicTrafficPacket(dcid: self.scid, using: self.trafficKeys.currentKeys) else {
                 print("PacketProtectorHandler[\(self.perspective)]::DecryptAndFlushTrafficBuffer::Failed to Decrypt Buffered Traffic Packet")
                 self.storedContext.fireErrorCaught(Errors.InvalidPacket)
                 break
