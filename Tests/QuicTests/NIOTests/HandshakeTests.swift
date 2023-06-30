@@ -55,7 +55,6 @@ final class QUICHandshakeTests: XCTestCase {
     var scid: ConnectionID!
     fileprivate var quicClientHandler: QUICClientHandler!
     fileprivate var clientErrorHandler: ErrorEventLogger!
-    fileprivate var clientTLSHandler: NIOSSLClientHandler!
     fileprivate var clientQuiesceEventRecorder: QuiesceEventRecorder!
 
     fileprivate var quicServer: QuicConnectionMultiplexer!
@@ -155,11 +154,9 @@ final class QUICHandshakeTests: XCTestCase {
 
         // Configure Client Channel
         self.quicClientHandler = clientHandler
-        self.clientTLSHandler = try! NIOSSLClientHandler(context: sslClientContext, serverHostname: nil)
         self.clientQuiesceEventRecorder = QuiesceEventRecorder()
         self.clientErrorHandler = ErrorEventLogger()
         XCTAssertNoThrow(try self.backToBack.client.pipeline.addHandler(self.quicClientHandler).wait())
-        XCTAssertNoThrow(try self.backToBack.client.pipeline.addHandler(self.clientTLSHandler).wait())
         XCTAssertNoThrow(try self.backToBack.client.pipeline.addHandler(self.clientErrorHandler).wait())
         XCTAssertNoThrow(try self.backToBack.client.pipeline.addHandler(self.clientQuiesceEventRecorder).wait())
 
@@ -187,7 +184,6 @@ final class QUICHandshakeTests: XCTestCase {
         self.clientInitialBytes = nil
 
         self.quicClientHandler = nil
-        self.clientTLSHandler = nil
         self.clientQuiesceEventRecorder = nil
         self.clientErrorHandler = nil
 
@@ -200,9 +196,6 @@ final class QUICHandshakeTests: XCTestCase {
     /// Takes about 5ms to generate a Client InitialPacket
     func testHandshake() throws {
         throw XCTSkip("This integration test is skipped by default")
-        
-        // This is set to v1.2 for historical reasons, v1.3 (which will be enforced) is specified in the `tls version` within the client hello
-        XCTAssertEqual(self.clientTLSHandler.tlsVersion, NIOSSL.TLSVersion.tlsv12)
 
         // Ensure our Client is generating an InitialPacket containing a ClientHello upon Channel Activation
         let firstClientDatagram = try backToBack.client.readOutbound(as: AddressedEnvelope<ByteBuffer>.self)
