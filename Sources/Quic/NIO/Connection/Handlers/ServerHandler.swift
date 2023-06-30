@@ -24,7 +24,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
 
     private let remoteAddress: SocketAddress
     private let ackHandler: ACKChannelHandler
-    private let packetProtectorHandler: PacketProtectorHandler2
+    private let packetProtectorHandler: PacketProtectorHandler
     private let tlsHandler: NIOSSLServerHandler
 
     private(set) var state: QuicStateMachine.State {
@@ -109,7 +109,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
         self.scid = ConnectionID(randomOfLength: 5) //sourceID ?? ConnectionID(randomOfLength: 8)
 
         // Initialize our PacketProtectorHandler
-        self.packetProtectorHandler = PacketProtectorHandler2(initialDCID: destinationID, scid: self.scid, version: version, perspective: .server, remoteAddress: remoteAddress)
+        self.packetProtectorHandler = PacketProtectorHandler(initialDCID: destinationID, scid: self.scid, version: version, perspective: .server, remoteAddress: remoteAddress)
         self.ackHandler = ACKChannelHandler()
 
         // Update the transport params with the original destination connection id
