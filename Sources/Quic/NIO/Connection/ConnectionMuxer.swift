@@ -974,3 +974,41 @@ extension QuicConnectionChannel: Hashable {
         hasher.combine(ObjectIdentifier(self))
     }
 }
+
+/// QUIC Connection Channel Events.
+enum ConnectionChannelEvent {
+
+    /// Traffic / Appliction Key Update Initiated
+    ///
+    /// Intended Event Propogation
+    /// ```
+    /// PacketProtectorHandler -> AckHandler -> StateHandler
+    /// ```
+    struct KeyUpdateInitiated: Hashable, Sendable {
+        /// The packetNumber at which the Key Update was initiated
+        public var packetNumber: UInt64
+
+        /// The initiator of the Key Update (client or server)
+        public var initiator: EndpointRole
+
+        public init(packetNumber: UInt64, initiator: EndpointRole) {
+            self.packetNumber = packetNumber
+            self.initiator = initiator
+        }
+    }
+
+    /// Traffic / Appliction Key Update Finished
+    ///
+    /// Intended Event Propogation
+    /// ```
+    /// AckHandler -> StateHandler
+    /// ```
+    struct KeyUpdateFinished: Hashable, Sendable {
+        /// The packetNumber at which the Key Update was completed
+        public var packetNumber: UInt64
+
+        public init(packetNumber: UInt64) {
+            self.packetNumber = packetNumber
+        }
+    }
+}
