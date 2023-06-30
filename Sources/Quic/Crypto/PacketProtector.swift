@@ -19,6 +19,7 @@ import NIOCore
 struct Sealer {
     internal let encryptor: any QBlockCipher
     internal let headerProtector: HeaderProtector
+    internal let updateSecret: SymmetricKey?
 
     public func applyHeaderProtection<SAMPLE, HEADER>(sample: SAMPLE, hdrBytes: inout HEADER, packetNumberOffset: Int) throws where SAMPLE: ContiguousBytes, HEADER: ContiguousBytes {
         try self.headerProtector.applyMask(sample: sample, headerBytes: &hdrBytes, packetNumberOffset: packetNumberOffset)
@@ -32,6 +33,7 @@ struct Sealer {
 struct Opener {
     internal let decrypter: any QBlockCipher
     internal let headerProtector: HeaderProtector
+    internal let updateSecret: SymmetricKey?
 
     public func removeHeaderProtection<SAMPLE, HEADER>(sample: SAMPLE, hdrBytes: inout HEADER, packetNumberOffset: Int) throws where SAMPLE: ContiguousBytes, HEADER: ContiguousBytes {
         try self.headerProtector.removeMask(sample: sample, headerBytes: &hdrBytes, packetNumberOffset: packetNumberOffset)
@@ -46,6 +48,7 @@ struct Opener {
 struct PacketProtector {
     let epoch: Epoch
     let version: Version
+    private(set) var suite: CipherSuite?
     private(set) var opener: Opener?
     private(set) var sealer: Sealer?
 
@@ -56,11 +59,13 @@ struct PacketProtector {
                  (.server, .server):
                 guard self.sealer == nil else { print("\(self.epoch)::Our Sealer is Already Installed"); throw Errors.Crypto(0) }
                 self.sealer = try self.version.newSealer(mySecret: SymmetricKey(data: secret), suite: suite)
+                self.suite = suite
 
             case (.server, .client),
                  (.client, .server):
                 guard self.opener == nil else { print("\(self.epoch)::Peers Opener is Already Installed"); throw Errors.Crypto(0) }
                 self.opener = try self.version.newOpener(otherSecret: SymmetricKey(data: secret), suite: suite)
+                self.suite = suite
         }
     }
 
@@ -68,6 +73,16 @@ struct PacketProtector {
         print("PacketProtector::\(self.epoch)::Dropping Keys")
         self.opener = nil
         self.sealer = nil
+        self.suite = nil
+    }
+
+    internal mutating func updateKeys(using existingKeys: PacketProtector) throws {
+        guard self.epoch == .Application, existingKeys.epoch == .Application else { throw Errors.Crypto(0) }
+        guard let cipherSuite = existingKeys.suite else { throw Errors.Crypto(0) }
+
+        self.opener = try existingKeys.version.updateOpener(existingOpener: existingKeys.opener!, suite: cipherSuite)
+        self.sealer = try existingKeys.version.updateSealer(existingSealer: existingKeys.sealer!, suite: cipherSuite)
+        self.suite = cipherSuite
     }
 
     func applyHeaderProtection<SAMPLE, HEADER>(sample: SAMPLE, headerBytes: inout HEADER, packetNumberOffset: Int) throws where SAMPLE: ContiguousBytes, HEADER: ContiguousBytes {
@@ -152,36 +167,59 @@ extension Version {
     }
 
     internal func newAEAD(mySecret: SymmetricKey, otherSecret: SymmetricKey, perspective: EndpointRole, suite: CipherSuite, epoch: Epoch) throws -> PacketProtector {
-        let (myKey, myIV) = try computeKeyAndIV(secret: mySecret, v: self, cipherSuite: suite)
-        let (otherKey, otherIV) = try computeKeyAndIV(secret: otherSecret, v: self, cipherSuite: suite)
+        let (myKey, myIV, myKU) = try computeKeyIVAndKU(secret: mySecret, v: self, cipherSuite: suite)
+        let (otherKey, otherIV, otherKU) = try computeKeyIVAndKU(secret: otherSecret, v: self, cipherSuite: suite)
 
         return PacketProtector(
             epoch: epoch,
             version: self,
+            suite: suite,
             opener: Opener(
                 decrypter: try suite.newBlockCipher(key: otherKey, iv: otherIV),
-                headerProtector: try suite.newHeaderProtector(trafficSecret: otherSecret, version: self)
+                headerProtector: try suite.newHeaderProtector(trafficSecret: otherSecret, version: self),
+                updateSecret: epoch == .Application ? otherKU : nil
             ),
             sealer: Sealer(
                 encryptor: try suite.newBlockCipher(key: myKey, iv: myIV),
-                headerProtector: try suite.newHeaderProtector(trafficSecret: mySecret, version: self)
+                headerProtector: try suite.newHeaderProtector(trafficSecret: mySecret, version: self),
+                updateSecret: epoch == .Application ? myKU : nil
             )
         )
     }
 
     internal func newOpener(otherSecret: SymmetricKey, suite: CipherSuite) throws -> Opener {
-        let (otherKey, otherIV) = try computeKeyAndIV(secret: otherSecret, v: self, cipherSuite: suite)
+        let (otherKey, otherIV, otherKU) = try computeKeyIVAndKU(secret: otherSecret, v: self, cipherSuite: suite)
         return Opener(
             decrypter: try suite.newBlockCipher(key: otherKey, iv: otherIV),
-            headerProtector: try suite.newHeaderProtector(trafficSecret: otherSecret, version: self)
+            headerProtector: try suite.newHeaderProtector(trafficSecret: otherSecret, version: self),
+            updateSecret: otherKU
         )
     }
 
     internal func newSealer(mySecret: SymmetricKey, suite: CipherSuite) throws -> Sealer {
-        let (myKey, myIV) = try computeKeyAndIV(secret: mySecret, v: self, cipherSuite: suite)
+        let (myKey, myIV, myKU) = try computeKeyIVAndKU(secret: mySecret, v: self, cipherSuite: suite)
         return Sealer(
             encryptor: try suite.newBlockCipher(key: myKey, iv: myIV),
-            headerProtector: try suite.newHeaderProtector(trafficSecret: mySecret, version: self)
+            headerProtector: try suite.newHeaderProtector(trafficSecret: mySecret, version: self),
+            updateSecret: myKU
+        )
+    }
+
+    internal func updateOpener(existingOpener: Opener, suite: CipherSuite) throws -> Opener {
+        let (otherKey, otherIV, otherKU) = try computeKeyIVAndKU(secret: existingOpener.updateSecret!, v: self, cipherSuite: suite)
+        return Opener(
+            decrypter: try suite.newBlockCipher(key: otherKey, iv: otherIV),
+            headerProtector: existingOpener.headerProtector,
+            updateSecret: otherKU
+        )
+    }
+
+    internal func updateSealer(existingSealer: Sealer, suite: CipherSuite) throws -> Sealer {
+        let (myKey, myIV, myKU) = try computeKeyIVAndKU(secret: existingSealer.updateSecret!, v: self, cipherSuite: suite)
+        return Sealer(
+            encryptor: try suite.newBlockCipher(key: myKey, iv: myIV),
+            headerProtector: existingSealer.headerProtector,
+            updateSecret: myKU
         )
     }
 
@@ -201,5 +239,12 @@ extension Version {
         let key = try suite.expandLabel(pseudoRandomKey: secret, label: v.hkdfTrafficProtectionLabel, outputByteCount: suite.keyLength)
         let iv = try suite.expandLabel(pseudoRandomKey: secret, label: v.hkdfInitialVectorLabel, outputByteCount: suite.ivLength)
         return (key, iv)
+    }
+
+    private func computeKeyIVAndKU(secret: SymmetricKey, v: Quic.Version, cipherSuite suite: CipherSuite) throws -> (key: SymmetricKey, iv: SymmetricKey, ku: SymmetricKey) {
+        let key = try suite.expandLabel(pseudoRandomKey: secret, label: v.hkdfTrafficProtectionLabel, outputByteCount: suite.keyLength)
+        let iv = try suite.expandLabel(pseudoRandomKey: secret, label: v.hkdfInitialVectorLabel, outputByteCount: suite.ivLength)
+        let ku = try suite.expandLabel(pseudoRandomKey: secret, label: v.hkdfTrafficProtectionUpdateLabel, outputByteCount: suite.keyLength)
+        return (key, iv, ku)
     }
 }
