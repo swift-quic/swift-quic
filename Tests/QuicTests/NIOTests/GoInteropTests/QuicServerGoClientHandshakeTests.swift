@@ -31,6 +31,7 @@ import XCTest
 ///             "context"
 ///             "crypto/tls"
 ///             "fmt"
+///             "strconv"
 ///             "io"
 ///             "github.com/quic-go/quic-go/internal/utils"
 ///             "github.com/quic-go/quic-go"
@@ -38,13 +39,11 @@ import XCTest
 ///
 ///    const addr = "127.0.0.1:4242"
 ///
-///    const message = "Hello swift-quic!"
-///
 ///    func main() {
-///            logger := utils.DefaultLogger
-///            logger.SetLogLevel(utils.LogLevelDebug)
+///             logger := utils.DefaultLogger
+///             logger.SetLogLevel(utils.LogLevelDebug)
 ///
-///            tlsConf := &tls.Config{
+///             tlsConf := &tls.Config{
 ///                     InsecureSkipVerify: true,
 ///                     NextProtos:         []string{"quic-echo-example"},
 ///             }
@@ -54,26 +53,31 @@ import XCTest
 ///                    return
 ///             }
 ///
-///             stream, err := conn.OpenStreamSync(context.Background())
-///             if err != nil {
-///                    fmt.Println("Error accepting stream:", err)
-///                    return
-///             }
+///             for i := 0; i < 200; i++ {
+///                    message := "Hello swift-quic! Stream[" + strconv.Itoa(i) + "]"
+///                    stream, err := conn.OpenStreamSync(context.Background())
+///                    if err != nil {
+///                            fmt.Println("Error accepting stream:", err)
+///                            return
+///                    }
 ///
-///             fmt.Printf("Client: Sending '%s'\n", message)
-///             _, err = stream.Write([]byte(message))
-///             if err != nil {
-///                    fmt.Println("Error writing to stream:", err)
-///                    return
-///             }
 ///
-///             buf := make([]byte, len(message))
-///             _, err = io.ReadFull(stream, buf)
-///             if err != nil {
-///                    fmt.Println("Error reading from stream:", err)
-///                    return
+///                    fmt.Printf("Client: Sending '%s'\n", message)
+///                    _, err = stream.Write([]byte(message))
+///                    if err != nil {
+///                            fmt.Println("Error writing to stream:", err)
+///                            return
+///                    }
+///
+///                    buf := make([]byte, len(message))
+///                    _, err = io.ReadFull(stream, buf)
+///                    if err != nil {
+///                            fmt.Println("Error reading from stream:", err)
+///                            return
+///                    }
+///
+///                    fmt.Printf("Client: Got '%s'\n", buf)
 ///             }
-///             fmt.Printf("Client: Got '%s'\n", buf)
 ///
 ///             return
 ///    }
@@ -191,10 +195,15 @@ final class QUICExternalDialServerTests: XCTestCase {
     }
 
     /// This test asserts that when we initialize a QUIC Client Channel, BoringSSL generates and write the client hello crypto frame upon channel activation.
+    ///
     /// Takes about 5ms to generate a Client InitialPacket
+    /// - Without StreamMuxer
+    ///     - 10,000 Synchronous Echo Streams 10.1mb (no memory leak)
+    /// - With StreamMuxer
+    ///     - 10,000 Synchronous Echo Streams 15+mb and slow (mucho memory leak)
     func testHandshake() throws {
         throw XCTSkip("This integration test is skipped by default")
-        
+
         // Bind to our UDP port (this activates the Handlers and kicks off a connection)
         self.channel = try! self.server.bind(host: "127.0.0.1", port: 4242).wait()
 
