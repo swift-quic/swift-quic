@@ -70,6 +70,8 @@ extension Version {
 
     static private let HKDF_LABEL_KEY_V1 = "quic key"
     static private let HKDF_LABEL_KEY_V2 = "quicv2 key"
+    static private let HKDF_LABEL_KEY_V1_UPDATE = "quic ku"
+    static private let HKDF_LABEL_KEY_V2_UPDATE = "quicv2 ku"
 
     /// Traffic Protection Key Generation Label
     /// - Note: To be used along side the `HKDF` to generate the `Key` used to initialize the `AES.Cipher` for packet protection.
@@ -79,6 +81,15 @@ extension Version {
                 return Version.HKDF_LABEL_KEY_V2
             default:
                 return Version.HKDF_LABEL_KEY_V1
+        }
+    }
+
+    public var hkdfTrafficProtectionUpdateLabel: String {
+        switch self {
+            case .version2:
+                return Version.HKDF_LABEL_KEY_V2_UPDATE
+            default:
+                return Version.HKDF_LABEL_KEY_V1_UPDATE
         }
     }
 
