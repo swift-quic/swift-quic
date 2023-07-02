@@ -35,6 +35,7 @@ struct VersionNegotiationPacket: Packet {
     let header: VersionNegotiationHeader
     let versions: [Version]
 
+    /// This initializer is intended for outbound Version Negotiation Packets (auto fills the supported versions).
     init(destinationID: ConnectionID, sourceID: ConnectionID) {
         self.header = VersionNegotiationHeader(
             destinationID: destinationID,
@@ -43,7 +44,16 @@ struct VersionNegotiationPacket: Packet {
         self.versions = supportedVersions
     }
 
-    var payload: [any Frame] {
+    /// This initializer is intended for Decoding inbound Version Negotiation Packets.
+    init(destinationID: ConnectionID, sourceID: ConnectionID, supportedVersions: [Version]) {
+        self.header = VersionNegotiationHeader(
+            destinationID: destinationID,
+            sourceID: sourceID
+        )
+        self.versions = supportedVersions
+    }
+
+    var payload: [Frame] {
         return self.versions.map { version in
             Frames.Raw(bytes: version.withUnsafeBytes { Array($0) })
         }
