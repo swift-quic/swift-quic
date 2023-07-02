@@ -22,12 +22,14 @@ struct Version: RawRepresentable {
     }
 }
 
+/// https://www.iana.org/assignments/quic/quic.xhtml
 extension Version {
-    /// https://datatracker.ietf.org/doc/draft-ietf-quic-v2/
-    static let version2: Version = 2
-    /// https://datatracker.ietf.org/doc/html/rfc9001
-    static let version1: Version = 1
-    /// https://datatracker.ietf.org/doc/html/draft-ietf-quic-tls-29
+    /// https://www.rfc-editor.org/rfc/rfc9369.html
+    /// TODO: We can set version2 to the incorrect identifier (0x2) during testing in order to force Version Negotiations to take place.
+    static let version2: Version = 0x6b33_43cf // 0x2
+    /// https://datatracker.ietf.org/doc/html/rfc9000
+    static let version1: Version = 0x1
+    /// https://datatracker.ietf.org/doc/html/draft-ietf-quic-transport-29
     static let versionDraft29: Version = 0xff00_001d
 }
 
