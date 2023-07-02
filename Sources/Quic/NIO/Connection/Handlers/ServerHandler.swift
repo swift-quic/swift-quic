@@ -414,6 +414,14 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
             print("QUICServerHandler::UserInboundEventTriggered::TODO::Got our key update finished message!")
             print(keyUpdateFinishedMessage)
             self.packetProtectorHandler.dropTrafficKeysForPreviousPhase()
+        } else if let versionNegotiated = event as? ConnectionChannelEvent.VersionNegotiated {
+            print("QUICServerHandler::UserInboundEventTriggered::ServerHandler Doesn't Support Version Negotiation (the Connection is only established when we support the version being requested)!")
+            print(versionNegotiated)
+            context.close(mode: .all, promise: nil)
+        } else if let versionNegotiationFailed = event as? ConnectionChannelEvent.FailedVersionNegotiation {
+            print("QUICServerHandler::UserInboundEventTriggered::ServerHandler Doesn't Support Version Negotiation (the Connection is only established when we support the version being requested)")
+            print(versionNegotiationFailed)
+            context.close(mode: .all, promise: nil)
         }
         // We consume this event. No need to pass it along.
     }
