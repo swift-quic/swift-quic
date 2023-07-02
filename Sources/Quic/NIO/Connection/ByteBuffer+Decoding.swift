@@ -619,6 +619,31 @@ extension ByteBuffer {
         return result
     }
 
+    mutating func readVersionNegotiationPacket() -> VersionNegotiationPacket? {
+        self.rewindReaderOnNil { `self` -> VersionNegotiationPacket? in
+            // The first byte only tells us that it's a Long Form Header (1st bit, the last 7 bits are unused / artbitrary)
+            guard let firstByte = self.readBytes(length: 1)?.first else { return nil }
+            let form = HeaderForm(rawValue: firstByte & HeaderForm.mask)
+            guard case .long = form else { return nil }
+
+            // The fact that the Version is set to 0 is the indicating factor that this is a Version negotiation packet
+            guard let version = self.readVersion() else { return nil }
+            guard version.rawValue == 0 else { return nil }
+
+            guard let dcid = self.readConnectionID() else { return nil }
+            guard let scid = self.readConnectionID() else { return nil }
+
+            var supportedVersions: [Version] = []
+            while self.readableBytes > 0, let v = self.readVersion() {
+                supportedVersions.append(v)
+            }
+
+            guard self.readableBytes == 0 else { return nil }
+
+            return VersionNegotiationPacket(destinationID: dcid, sourceID: scid, supportedVersions: supportedVersions)
+        }
+    }
+
     //    // https://www.rfc-editor.org/rfc/rfc9000.html#name-sample-variable-length-inte
     //    func readQuicVarInt() -> (bytesRead: Int, value: UInt64)? {
     //
