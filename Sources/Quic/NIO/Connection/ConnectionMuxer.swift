@@ -996,10 +996,10 @@ enum ConnectionChannelEvent {
     /// ```
     struct KeyUpdateInitiated: Hashable, Sendable {
         /// The packetNumber at which the Key Update was initiated
-        public var packetNumber: UInt64
+        public let packetNumber: UInt64
 
         /// The initiator of the Key Update (client or server)
-        public var initiator: EndpointRole
+        public let initiator: EndpointRole
 
         public init(packetNumber: UInt64, initiator: EndpointRole) {
             self.packetNumber = packetNumber
@@ -1015,10 +1015,40 @@ enum ConnectionChannelEvent {
     /// ```
     struct KeyUpdateFinished: Hashable, Sendable {
         /// The packetNumber at which the Key Update was completed
-        public var packetNumber: UInt64
+        public let packetNumber: UInt64
 
         public init(packetNumber: UInt64) {
             self.packetNumber = packetNumber
+        }
+    }
+
+    /// Version Negotiation Event
+    ///
+    /// Intended Event Propogation
+    /// ```
+    /// PacketProtectorHandler -> StateHandler
+    /// ```
+    struct VersionNegotiated: Hashable, Sendable {
+        /// The Version that was negotiated
+        public let version: Version
+
+        public init(version: Version) {
+            self.version = version
+        }
+    }
+
+    /// Failed Version Negotiation Event
+    ///
+    /// Intended Event Propogation
+    /// ```
+    /// PacketProtectorHandler -> StateHandler
+    /// ```
+    struct FailedVersionNegotiation: Hashable, Sendable {
+        /// The error encountered while attempting to negotiate a support Version
+        public let error: String
+
+        public init(error: String) {
+            self.error = error
         }
     }
 }
