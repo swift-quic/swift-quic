@@ -44,7 +44,7 @@ final class TLSClientInitialTests: XCTestCase {
         let sslContext = try! NIOSSLContext(configuration: configuration)
 
         self.channel = EmbeddedChannel()
-        self.quicClientHandler = try! QUICClientHandler(SocketAddress(ipAddress: "127.0.0.1", port: 0), version: self.version, destinationID: self.dcid, sourceID: self.scid, tlsContext: sslContext)
+        self.quicClientHandler = try! QUICClientHandler(SocketAddress(ipAddress: "127.0.0.1", port: 0), versions: [self.version], destinationID: self.dcid, sourceID: self.scid, tlsContext: sslContext)
         self.quiesceEventRecorder = QuiesceEventRecorder()
         self.errorHandler = ErrorEventLogger()
         XCTAssertNoThrow(try self.channel.pipeline.addHandler(self.quicClientHandler).wait())
