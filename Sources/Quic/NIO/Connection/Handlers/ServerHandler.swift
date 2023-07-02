@@ -200,7 +200,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         guard let clientHello = try? ClientHello(header: [], payload: &clientHelloBytes) else { context.fireErrorCaught(Errors.InvalidPacket); return }
                         print(clientHello)
                         print("Quic Params")
-                        var extBuf = ByteBuffer(bytes: clientHello.extensions.first(where: { $0.type == [0x00, 0x39] })!.value)
+                        var extBuf = ByteBuffer(bytes: clientHello.extensions.first(where: { $0.type == [0x00, 0x39] || $0.type == [0xff, 0xa5] })!.value)
                         let quicParams = try! TransportParams.decode(&extBuf, perspective: .server)
                         print(quicParams)
 
