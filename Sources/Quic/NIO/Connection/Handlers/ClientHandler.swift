@@ -516,6 +516,36 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
         ctx.close(promise: nil)
     }
 
+    public func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        if let keyUpdateInitiatedMessage = event as? ConnectionChannelEvent.KeyUpdateInitiated {
+            print("QUICClientHandler::UserInboundEventTriggered::TODO::Got our key update initiated message!")
+            print(keyUpdateInitiatedMessage)
+        } else if let keyUpdateFinishedMessage = event as? ConnectionChannelEvent.KeyUpdateFinished {
+            print("QUICClientHandler::UserInboundEventTriggered::TODO::Got our key update finished message!")
+            print(keyUpdateFinishedMessage)
+            self.packetProtectorHandler.dropTrafficKeysForPreviousPhase()
+        } else if let versionNegotiated = event as? ConnectionChannelEvent.VersionNegotiated {
+            print("QUICClientHandler::UserInboundEventTriggered::TODO::Handle Version Negotiated Event!")
+            print(versionNegotiated)
+            // Do we uninstall and reinstall our TLSHandler?
+            guard versionNegotiated.version != self.version else { return }
+            self.version = versionNegotiated.version
+            let _ = context.pipeline.removeHandler(self.tlsHandler).map {
+                self.tlsHandler = try! NIOSSLClientHandler(context: self.tlsContext, serverHostname: nil)
+                self.tlsHandler.setQuicDelegate(self)
+                return context.pipeline.addHandler(self.tlsHandler, position: .after(self))
+            }.always { _ in
+                print("Done Reinstalling NIOSSLHandler")
+            }
+
+        } else if let versionNegotiationFailed = event as? ConnectionChannelEvent.FailedVersionNegotiation {
+            print("QUICClientHandler::UserInboundEventTriggered::TODO::Handle Failed Version Negotiation!")
+            print(versionNegotiationFailed)
+            context.close(mode: .all, promise: nil)
+        }
+        // We consume these events. No need to pass it along.
+    }
+
     private func handleShortPacketPayloads(context: ChannelHandlerContext, frames: [Frame]) {
 
         for frame in frames {
