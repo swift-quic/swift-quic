@@ -110,7 +110,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
         self.scid = ConnectionID(randomOfLength: 5) //sourceID ?? ConnectionID(randomOfLength: 8)
 
         // Initialize our PacketProtectorHandler
-        self.packetProtectorHandler = PacketProtectorHandler(initialDCID: destinationID, scid: self.scid, version: version, perspective: .server, remoteAddress: remoteAddress)
+        self.packetProtectorHandler = PacketProtectorHandler(initialDCID: destinationID, scid: self.scid, versions: [version], perspective: .server, remoteAddress: remoteAddress)
         self.ackHandler = ACKChannelHandler()
 
         // Update the transport params with the original destination connection id
