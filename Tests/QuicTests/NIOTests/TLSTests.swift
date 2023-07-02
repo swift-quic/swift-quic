@@ -45,6 +45,7 @@ final class TLSClientInitialTests: XCTestCase {
 
         self.channel = EmbeddedChannel()
         self.quicClientHandler = try! QUICStateHandler(SocketAddress(ipAddress: "127.0.0.1", port: 0), perspective: .client, version: self.version, destinationID: self.dcid, sourceID: self.scid, tlsContext: sslContext)
+
         self.quiesceEventRecorder = QuiesceEventRecorder()
         self.errorHandler = ErrorEventLogger()
         XCTAssertNoThrow(try self.channel.pipeline.addHandler(self.quicClientHandler).wait())
