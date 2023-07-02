@@ -33,7 +33,6 @@ struct QuicStateMachine {
 }
 
 final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
-    // typealias changes to wrap out ByteBuffer in an AddressedEvelope which describes where the packages are going
     public typealias InboundIn = Packet
     public typealias InboundOut = ByteBuffer
     public typealias OutboundOut = [any Packet]
@@ -42,14 +41,15 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     private let remoteAddress: SocketAddress
     private let ackHandler: ACKChannelHandler
     private let packetProtectorHandler: PacketProtectorHandler
-    private let tlsHandler: NIOSSLClientHandler
+    private var tlsHandler: NIOSSLClientHandler
+    private let tlsContext: NIOSSLContext
 
     private(set) var state: QuicStateMachine.State {
         didSet { print("QUICClientHandler::State::Transitioned from \(oldValue) to \(self.state)") }
     }
 
     let mode: EndpointRole = .client
-    let version: Quic.Version
+    var version: Quic.Version
 
     var retiredDCIDs: [ConnectionID] = []
     var dcid: Quic.ConnectionID {
@@ -115,18 +115,19 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     //var cumulativeCrypto:ByteBuffer = ByteBuffer()
     var partialCryptoBuffer: ByteBuffer = ByteBuffer()
 
-    public init(_ remoteAddress: SocketAddress, version: Version, destinationID: ConnectionID? = nil, sourceID: ConnectionID? = nil, tlsContext: NIOSSLContext) {
+    public init(_ remoteAddress: SocketAddress, versions: [Version], destinationID: ConnectionID? = nil, sourceID: ConnectionID? = nil, tlsContext: NIOSSLContext) {
         self.remoteAddress = remoteAddress
-        self.version = version
+        self.version = versions.first!
         self.state = .idle
         self.transportParams = TransportParams.default
+        self.tlsContext = tlsContext
 
         // Initialize our Connection ID's
         self.dcid = destinationID ?? ConnectionID(randomOfLength: 12)
         self.scid = sourceID ?? ConnectionID(randomOfLength: 0)
 
         // Initialize our PacketProtectorHandler
-        self.packetProtectorHandler = PacketProtectorHandler(initialDCID: self.dcid, scid: self.scid, version: version, perspective: .client, remoteAddress: remoteAddress)
+        self.packetProtectorHandler = PacketProtectorHandler(initialDCID: self.dcid, scid: self.scid, versions: versions, perspective: .client, remoteAddress: remoteAddress)
         self.ackHandler = ACKChannelHandler()
 
         // Update the transport params with the original destination connection id
