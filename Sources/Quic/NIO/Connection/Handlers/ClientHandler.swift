@@ -262,7 +262,7 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         guard var encryptedExtensions = frameBuf.readTLSEncryptedExtensions() else { print("QUICClientHandler::ChannelRead::Expected EncryptedExtensions Frame, didn't get it"); return }
                         guard let certificate = frameBuf.readTLSCertificate() else { print("QUICClientHandler::ChannelRead::Expected Certificate Frame, didn't get it"); return }
 
-                        let quicParamsOffset = encryptedExtensions.firstRange(of: [0x00, 0x39])!
+                        guard let quicParamsOffset = encryptedExtensions.firstRange(of: [0x00, 0x39]) ?? encryptedExtensions.firstRange(of: [0xff, 0xa5]) else { fatalError("Failed to extract QUIC Params") }
                         var extBuf = ByteBuffer(bytes: encryptedExtensions.dropFirst(quicParamsOffset.startIndex + 4))
                         print(encryptedExtensions.hexString)
                         print(extBuf.readableBytesView.hexString)
