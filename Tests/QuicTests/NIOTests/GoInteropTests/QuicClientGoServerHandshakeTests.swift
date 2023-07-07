@@ -179,7 +179,7 @@ final class QUICExternalDialClientTests: XCTestCase {
         let sslClientContext = try! NIOSSLContext(configuration: configuration)
 
         // Configure our Handlers
-        self.quicClientHandler = try! QUICStateHandler(SocketAddress(ipAddress: "127.0.0.1", port: 4242), perspective: .client, versions: [self.version], destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext)
+        self.quicClientHandler = try! QUICStateHandler(SocketAddress(ipAddress: "127.0.0.1", port: 4242), perspective: .client, versions: [self.version], destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext, idleTimeout: .milliseconds(200))
 
         // Configure Client Channel
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
@@ -212,7 +212,6 @@ final class QUICExternalDialClientTests: XCTestCase {
         // Bind to our UDP port (this activates the Handlers and kicks off a connection)
         self.channel = try! self.client.connect(host: "127.0.0.1", port: 4242).wait()
 
-        // TODO: Figure out how to timeout here...
         try self.channel.closeFuture.wait()
     }
 }
