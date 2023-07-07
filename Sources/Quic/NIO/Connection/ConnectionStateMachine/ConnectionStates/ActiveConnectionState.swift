@@ -18,7 +18,7 @@ extension QUICConnectionStateMachine {
     struct ActiveState {
         let role: EndpointRole
         let epoch: Epoch
-        
+
         var bufferedInboundPackets: [any Packet] = []
 
         init(previous: HandshakingState) {
@@ -57,7 +57,13 @@ extension QUICConnectionStateMachine {
                 try results.append(contentsOf: self.processOutboundFrame(frame, perspective: self.role) ?? [])
             }
 
-            results.append(.emitPackets(packets: [(epoch: .Application, frames: frames.frames)]))
+            let framesToEmit = results.compactMap {
+                if case .forwardFrame(let frame) = $0 {
+                    return frame
+                } else { return nil }
+            }
+
+            results = [.emitPackets(packets: [(epoch: .Application, frames: framesToEmit)])]
 
             return results
         }
@@ -86,8 +92,8 @@ extension QUICConnectionStateMachine.ActiveState {
 
             case Frames.Crypto.type:
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle Crypto")
-            // Pass the Crypto Frame along the pipeline (the NIOSSLHandler will pick it up and consume it)
-            //return [.forwardFrame(frame)]
+                // Pass the Crypto Frame along the pipeline (the NIOSSLHandler will pick it up and consume it)
+                //return [.forwardFrame(frame)]
 
             case Frames.NewToken.type:
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle NewToken")
@@ -128,6 +134,7 @@ extension QUICConnectionStateMachine.ActiveState {
 
             case 0x1c...0x1d: //Frames.ConnectionClose
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle Connection Close")
+                return [.disconnect]
 
             case Frames.HandshakeDone.type:
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle Handshake Done")
@@ -144,12 +151,12 @@ extension QUICConnectionStateMachine.ActiveState {
                 return []
             case Frames.Ping.type:
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle Ping")
-            // TODO: Respond to PING
-            //return [.emitPackets(packets: [(epoch: .Application, frames: [Frames.Ping()])])]
+                // TODO: Respond to PING
+                return [.forwardFrame(Frames.Ping())]
 
             case 0x02...0x03: //Frames.ACK
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle ACK")
-            // We can neglect / discard these as they've already been processed by our ack handler
+                // We can neglect / discard these as they've already been processed by our ack handler
 
             case Frames.ResetStream.type:
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle ResetStream")
@@ -159,15 +166,16 @@ extension QUICConnectionStateMachine.ActiveState {
 
             case Frames.Crypto.type:
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle Crypto")
-            // Pass the Crypto Frame along the pipeline (the NIOSSLHandler will pick it up and consume it)
-            //return [.forwardFrame(frame)]
+                // Pass the Crypto Frame along the pipeline (the NIOSSLHandler will pick it up and consume it)
+                //return [.forwardFrame(frame)]
+                print("‼️ Dropping Outbound Crypto Frame while in Active State ‼️")
 
             case Frames.NewToken.type:
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle NewToken")
 
             case 0x08...0x0f: //Frames.Stream
-                print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle Stream Frame")
-            //return [.forwardFrame(frame)]
+                print("QUICStateHandler[\(perspective)]::ProcessFrame::Forwarding Stream Frame")
+                return [.forwardFrame(frame)]
 
             case Frames.MaxData.type:
                 print("QUICStateHandler[\(perspective)]::ProcessFrame::Handle Max Data")
