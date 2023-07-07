@@ -35,7 +35,7 @@ final class StreamStateHandler: ChannelInboundHandler {
             if context.channel.isActive, chan.perspective == .client {
                 print("Attempting to open Stream as Client")
                 let messageToSend = "Hello from swift-quic!"
-                let newStream = Frames.Stream(streamID: StreamID(rawValue: VarInt(integerLiteral: 0)), offset: VarInt(integerLiteral: 0), length: VarInt(integerLiteral: UInt64(messageToSend.count)), fin: true, data: ByteBuffer(string: messageToSend))
+                let newStream = Frames.Stream(streamID: StreamID(rawValue: VarInt(integerLiteral: 0)), offset: VarInt(integerLiteral: 0), length: VarInt(integerLiteral: UInt64(messageToSend.count)), fin: false, data: ByteBuffer(string: messageToSend))
                 var buffer = ByteBuffer()
                 newStream.encode(into: &buffer)
                 let _ = context.writeAndFlush(self.wrapOutboundOut(buffer)).always { res in
