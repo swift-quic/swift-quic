@@ -172,7 +172,7 @@ final class QUICExternalDialServerTests: XCTestCase {
             .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .channelInitializer { channel in
                 channel.pipeline.addHandlers([
-                    QuicConnectionMultiplexer(channel: channel, tlsContext: sslServerContext, inboundConnectionInitializer: nil),
+                    QuicConnectionMultiplexer(channel: channel, tlsContext: sslServerContext, idleTimeout: .milliseconds(500), inboundConnectionInitializer: nil),
                     self.serverQuiesceEventRecorder,
                     self.serverErrorHandler
                 ])
