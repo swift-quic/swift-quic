@@ -118,7 +118,6 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
             self.connections[envelope.remoteAddress] = channel
 
             try! channel.pipeline.syncOperations.addHandlers([
-
                 QUICStateHandler(envelope.remoteAddress, perspective: .server, versions: [version], destinationID: dcid, sourceID: scid, tlsContext: self.tlsContext, idleTimeout: self.idleTimeout)
             ])
             channel.configure(initializer: self.inboundConnectionStateInitializer, userPromise: nil)
