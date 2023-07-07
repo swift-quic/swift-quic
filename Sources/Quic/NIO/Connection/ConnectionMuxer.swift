@@ -46,10 +46,12 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
     private var didReadChannels: ConnectionChannelList = ConnectionChannelList()
     private var flushState: FlushState = .notReading
     private var tlsContext: NIOSSLContext
+    private var idleTimeout: TimeAmount
 
-    public init(channel: Channel, tlsContext: NIOSSLContext, inboundConnectionInitializer initializer: ((Channel) -> EventLoopFuture<Void>)?) {
+    public init(channel: Channel, tlsContext: NIOSSLContext, idleTimeout: TimeAmount = .seconds(3), inboundConnectionInitializer initializer: ((Channel) -> EventLoopFuture<Void>)?) {
         self.channel = channel
         self.tlsContext = tlsContext
+        self.idleTimeout = idleTimeout
         self.inboundConnectionStateInitializer = initializer
     }
 
@@ -116,7 +118,8 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
             self.connections[envelope.remoteAddress] = channel
 
             try! channel.pipeline.syncOperations.addHandlers([
-                QUICStateHandler(envelope.remoteAddress, perspective: .server, version: version, destinationID: dcid, sourceID: scid, tlsContext: self.tlsContext)
+
+                QUICStateHandler(envelope.remoteAddress, perspective: .server, versions: [version], destinationID: dcid, sourceID: scid, tlsContext: self.tlsContext, idleTimeout: self.idleTimeout)
             ])
             channel.configure(initializer: self.inboundConnectionStateInitializer, userPromise: nil)
             channel.pipeline.fireChannelActive()
