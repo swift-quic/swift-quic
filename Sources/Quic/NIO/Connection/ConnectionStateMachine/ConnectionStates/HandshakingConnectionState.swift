@@ -18,7 +18,7 @@ extension QUICConnectionStateMachine {
     struct HandshakingState {
         let role: EndpointRole
         private(set) var epoch: Epoch
-        
+
         private(set) var state: HandshakeStateMachine
 
         var bufferedInboundPackets: [any Packet] = []
@@ -44,11 +44,14 @@ extension QUICConnectionStateMachine {
             var results: [StateMachineResult] = []
 
             if packet as? ShortPacket != nil {
-                guard let handshakeDone = packet.payload.first(where: { $0 as? Frames.HandshakeDone != nil }) as? Frames.HandshakeDone else {
+                if let handshakeDone = packet.payload.first(where: { $0 as? Frames.HandshakeDone != nil }) as? Frames.HandshakeDone {
+                    try self.state.processHandshakeDoneFrame(handshakeDone)
+                    self.bufferedInboundPackets.insert(packet, at: 0)
+                } else if let crypto = packet.payload.first(where: { $0 as? Frames.Crypto != nil }) as? Frames.Crypto {
+                    results.append(contentsOf: try self.state.processCryptoFrame(crypto))
+                } else {
                     throw Errors.invalidStateTransition
                 }
-                try self.state.processHandshakeDoneFrame(handshakeDone)
-                self.bufferedInboundPackets.insert(packet, at: 0)
             } else {
                 for frame in packet.payload {
 
@@ -161,9 +164,9 @@ extension QUICConnectionStateMachine.HandshakingState {
         public mutating func processCryptoFrame(_ frame: Frames.Crypto) throws -> [QUICConnectionStateMachine.StateMachineResult] {
             // Write the new crypto data into our buffer...
             self.bufferedData.writeBytes(frame.data)
-
+            //print("QUICConnectionStateMachine[\(self.role)]::HandshakingState::ProcessCryptoFrame::\(self.state)")
             var results: [QUICConnectionStateMachine.StateMachineResult] = []
-            var frames: [UInt8] = []
+            var frames: [[UInt8]] = []
             var packetsToEmit: [(Epoch, [any Frame])] = []
 
             while self.bufferedData.readableBytes > 0 {
@@ -208,12 +211,7 @@ extension QUICConnectionStateMachine.HandshakingState {
                                 break
                             case .success(let encExt):
                                 self.state = .processedEncryptedExtensions
-                                if self.role == .client {
-                                    //results.append(.forwardFrame(Frames.Crypto(offset: VarInt(integerLiteral: 0), data: encExt)))
-                                    frames.append(contentsOf: encExt)
-                                } else {
-                                    frames.append(contentsOf: encExt)
-                                }
+                                frames.append(encExt)
                         }
 
                     case .processedEncryptedExtensions:
@@ -224,12 +222,7 @@ extension QUICConnectionStateMachine.HandshakingState {
                                 break
                             case .success(let cert):
                                 self.state = .processedCertificate
-                                if self.role == .client {
-                                    //results.append(.forwardFrame(Frames.Crypto(offset: VarInt(integerLiteral: 0), data: cert)))
-                                    frames.append(contentsOf: cert)
-                                } else {
-                                    frames.append(contentsOf: cert)
-                                }
+                                frames.append(cert)
                         }
 
                     case .processedCertificate:
@@ -240,12 +233,7 @@ extension QUICConnectionStateMachine.HandshakingState {
                                 break
                             case .success(let certVerify):
                                 self.state = .processedCertVerify
-                                if self.role == .client {
-                                    //results.append(.forwardFrame(Frames.Crypto(offset: VarInt(integerLiteral: 0), data: certVerify)))
-                                    frames.append(contentsOf: certVerify)
-                                } else {
-                                    frames.append(contentsOf: certVerify)
-                                }
+                                frames.append(certVerify)
                         }
 
                     case .processedCertVerify:
@@ -256,12 +244,7 @@ extension QUICConnectionStateMachine.HandshakingState {
                                 break
                             case .success(let serverFinished):
                                 self.state = .processedServerFinished
-                                if self.role == .client {
-                                    //results.append(.forwardFrame(Frames.Crypto(offset: VarInt(integerLiteral: 0), data: serverFinished)))
-                                    frames.append(contentsOf: serverFinished)
-                                } else {
-                                    frames.append(contentsOf: serverFinished)
-                                }
+                                frames.append(serverFinished)
                         }
 
                     case .processedServerFinished:
@@ -284,7 +267,16 @@ extension QUICConnectionStateMachine.HandshakingState {
 
                     case .processedClientFinished:
                         print("QUICConnectionStateMachine[\(self.role)]::HandshakingState::Waiting for HandshakeDone Frame!")
-                        print(self.bufferedData.readableBytesView.hexString)
+                        switch self.bufferedData.readTLSFrame() {
+                            case .invalidFrame:
+                                print("Encountered Invalid TLS Frame")
+                                print(self.bufferedData.readableBytesView.hexString)
+                            case .needMoreData:
+                                print("Need More Data To Read TLS Frame")
+                                print(self.bufferedData.readableBytesView.hexString)
+                            case .success(let frame):
+                                print("Received a TLS Frame of type `\(frame.0)` with contents: \(frame.1.hexString)")
+                        }
 
                     case .processedDone:
                         print("QUICConnectionStateMachine[\(self.role)]::HandshakingState::Already Done!")
@@ -293,10 +285,10 @@ extension QUICConnectionStateMachine.HandshakingState {
             }
 
             if self.role == .server, !frames.isEmpty {
-                packetsToEmit.append((epoch: .Handshake, frames: [Frames.Crypto(offset: VarInt(integerLiteral: 0), data: frames)]))
+                packetsToEmit.append((epoch: .Handshake, frames: [Frames.Crypto(offset: VarInt(integerLiteral: 0), data: frames.reduce([], +))]))
                 frames = []
             } else if self.role == .client, !frames.isEmpty {
-                results.insert(.forwardFrame(Frames.Crypto(offset: VarInt(integerLiteral: 0), data: frames)), at: 0)
+                results.insert(.forwardFrame(Frames.Crypto(offset: VarInt(integerLiteral: 0), data: frames.reduce([], +))), at: 0)
                 frames = []
             }
 
