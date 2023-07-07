@@ -27,11 +27,12 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     private let remoteAddress: SocketAddress
     private let ackHandler: ACKChannelHandler
     private let packetProtectorHandler: PacketProtectorHandler
-    private let tlsHandler: NIOSSLHandler
+    private let tlsContext: NIOSSLContext
+    private var tlsHandler: NIOSSLHandler
 
     private(set) var state: QUICConnectionStateMachine
+    private(set) var version: Quic.Version
     let perspective: EndpointRole
-    let version: Quic.Version
 
     var retiredDCIDs: [ConnectionID] = []
     var dcid: Quic.ConnectionID {
@@ -59,36 +60,45 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     /// Our Transport Params
     private var transportParams: TransportParams
 
-    //var partialCryptoBuffer: ByteBuffer = ByteBuffer()
+    private var idleTimeoutTask: Scheduled<Void>!
+    private var idleTimeout: TimeAmount
+    private let MINIMUM_IDLE_TIMEOUT: TimeAmount = .milliseconds(100)
 
-    public init(_ remoteAddress: SocketAddress, perspective: EndpointRole, version: Version, destinationID: ConnectionID? = nil, sourceID: ConnectionID? = nil, tlsContext: NIOSSLContext) {
+    public init(_ remoteAddress: SocketAddress, perspective: EndpointRole, versions: [Version], destinationID: ConnectionID? = nil, sourceID: ConnectionID? = nil, tlsContext: NIOSSLContext, idleTimeout: TimeAmount = .seconds(3)) {
+        guard !versions.isEmpty else { fatalError("Versions can't be empty") }
         self.remoteAddress = remoteAddress
         self.perspective = perspective
-        self.version = version
+        self.version = versions.first!
         self.state = QUICConnectionStateMachine(role: perspective)
         self.transportParams = TransportParams.default
-
+        self.tlsContext = tlsContext
+        if idleTimeout.nanoseconds > 0 && idleTimeout < self.MINIMUM_IDLE_TIMEOUT {
+            print("QUICStateHandler[\(self.perspective)]::WARNING::Non Zero IdleTimeouts less than \(self.MINIMUM_IDLE_TIMEOUT.nanoseconds / 1_000_000)ms are not supported. Adjusting timeout to a value of \(self.MINIMUM_IDLE_TIMEOUT.nanoseconds / 1_000_000)ms.")
+            self.idleTimeout = self.MINIMUM_IDLE_TIMEOUT
+        } else {
+            self.idleTimeout = idleTimeout
+        }
         // Initialize our Connection ID's
         //self.dcid = perspective == .client ? destinationID ?? ConnectionID(randomOfLength: 12) : sourceID ?? ConnectionID(randomOfLength: 0)
         self.dcid = destinationID ?? ConnectionID(randomOfLength: 12)
         self.scid = perspective == .client ? sourceID ?? ConnectionID(randomOfLength: 0) : sourceID ?? ConnectionID(randomOfLength: 0)
 
         // Initialize our PacketProtectorHandler
-        self.packetProtectorHandler = PacketProtectorHandler(initialDCID: self.dcid, scid: self.scid, version: version, perspective: self.perspective, remoteAddress: remoteAddress)
+        self.packetProtectorHandler = PacketProtectorHandler(initialDCID: self.dcid, scid: self.scid, versions: versions, perspective: self.perspective, remoteAddress: remoteAddress)
         self.ackHandler = ACKChannelHandler()
 
         // Update the transport params with the original destination connection id
         self.transportParams.original_destination_connection_id = self.dcid
         self.transportParams.initial_source_connection_id = self.scid
-        self.transportParams.max_idle_timeout = 30
+        self.transportParams.max_idle_timeout = UInt64(idleTimeout.nanoseconds / 1_000_000)
         self.transportParams.stateless_reset_token = nil
         self.transportParams.max_udp_payload_size = 1_452
         self.transportParams.initial_max_data = 786_432
         self.transportParams.initial_max_stream_data_bidi_local = 524_288
         self.transportParams.initial_max_stream_data_bidi_remote = 524_288
         self.transportParams.initial_max_stream_data_uni = 524_288
-        self.transportParams.initial_max_streams_bidi = 100
-        self.transportParams.initial_max_streams_uni = 100
+        self.transportParams.initial_max_streams_bidi = 1010
+        self.transportParams.initial_max_streams_uni = 1010
         //self.transportParams.ack_delay_exponent = 3
         //self.transportParams.max_ack_delay = 26
         //self.transportParams.disable_active_migration = true
@@ -109,6 +119,10 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
         self.tlsHandler.setQuicDelegate(self)
     }
 
+    deinit {
+        print("QUICStateHandler[\(self.perspective)]::Deinit")
+    }
+
     public func handlerAdded(context: ChannelHandlerContext) {
         print("QUICStateHandler[\(self.perspective)]::Added")
         self.storedContext = context
@@ -123,11 +137,18 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
         try! context.pipeline.syncOperations.addHandler(self.ackHandler, position: .before(self))
         // Install the TLSHandler behind us
         try! context.pipeline.syncOperations.addHandler(self.tlsHandler, position: .after(self))
+
+        // Kick off our IdleTimeout timer.
+        self.updateIdleTimeout()
     }
 
     public func handlerRemoved(context: ChannelHandlerContext) {
         // We now want to drop the stored context.
         print("QUICStateHandler[\(self.perspective)]::HandlerRemoved")
+        if self.idleTimeoutTask != nil {
+            self.idleTimeoutTask.cancel()
+            self.idleTimeoutTask = nil
+        }
         self.storedContext = nil
     }
 
@@ -163,6 +184,9 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
         let packet = unwrapInboundIn(data)
         print("QUICStateHandler[\(self.perspective)]::ChannelRead") //::\(packet)")
 
+        // Update our idle timeout
+        self.updateIdleTimeout()
+
         do {
             self.state.bufferInboundPacket(packet)
             while let results = try self.state.processInboundFrame() {
@@ -179,6 +203,9 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         var buffer = unwrapOutboundIn(data)
         print("QUICStateHandler[\(self.perspective)]::Write::\(buffer.readableBytesView.hexString)")
+
+        // Update our idle timeout
+        self.updateIdleTimeout()
 
         do {
             guard let results = try self.state.processOutboundFrame(&buffer) else {
@@ -219,17 +246,9 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                 }
 
             case .emitPackets(let packetsToEmit):
+                guard !self.state.hasBegunDisconnect else { return }
                 var packets: [any Packet] = []
                 for p in packetsToEmit {
-//                    var frameBuf = ByteBuffer()
-//                    for frame in p.frames {
-//                        frame.encode(into: &frameBuf)
-//                        if let results = try self.state.processOutboundFrame(&frameBuf) {
-//                            for result in results {
-//                                try self.handleResult(result, packet: packet, context: context)
-//                            }
-//                        }
-//                    }
                     switch p.epoch {
                         case .Initial:
                             packets.append(
@@ -284,6 +303,12 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                 frame.encode(into: &buf)
                 context.fireChannelRead(self.wrapInboundOut(buf))
 
+            case .disconnect:
+                try? self.state.sentConnectionClose()
+                self.tlsHandler.stopTLS(promise: nil)
+                self.storedContext.pipeline.removeHandler(self.tlsHandler, promise: nil)
+                self.storedContext.close(mode: .all, promise: nil)
+
             default:
                 // Update ConnectionIDs
                 // Update Tokens
@@ -306,6 +331,81 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     public func errorCaught(ctx: ChannelHandlerContext, error: Error) {
         print("QUICStateHandler[\(self.perspective)]::ErrorCaught: \(error)")
         ctx.close(promise: nil)
+    }
+
+    public func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        if let keyUpdateInitiatedMessage = event as? ConnectionChannelEvent.KeyUpdateInitiated {
+            print("QUICStateHandler[\(self.perspective)]::UserInboundEventTriggered::TODO::Got our key update initiated message!")
+            print(keyUpdateInitiatedMessage)
+        } else if let keyUpdateFinishedMessage = event as? ConnectionChannelEvent.KeyUpdateFinished {
+            print("QUICStateHandler[\(self.perspective)]::UserInboundEventTriggered::TODO::Got our key update finished message!")
+            print(keyUpdateFinishedMessage)
+            self.packetProtectorHandler.dropTrafficKeysForPreviousPhase()
+        } else if let versionNegotiated = event as? ConnectionChannelEvent.VersionNegotiated {
+            print("QUICStateHandler[\(self.perspective)]::UserInboundEventTriggered::TODO::Handle Version Negotiated Event!")
+            print(versionNegotiated)
+            guard self.perspective == .client else { fatalError("QUICStateHandler[\(self.perspective)]::UserInboundEventTriggered::Server Side Connections Don't Support Version Negotiations") }
+            guard versionNegotiated.version != self.version else { return }
+            // Cancel our idleTimeoutTask
+            self.idleTimeoutTask.cancel()
+            // Update our stored Version
+            self.version = versionNegotiated.version
+            // Re init the State Machine
+            self.state = QUICConnectionStateMachine(role: self.perspective)
+            try! self.state.beginHandshake()
+            // Uninstall and reinstall our TLSHandler
+            let _ = context.pipeline.removeHandler(self.tlsHandler).map {
+                self.tlsHandler = try! NIOSSLClientHandler(context: self.tlsContext, serverHostname: nil)
+                self.tlsHandler.setQuicDelegate(self)
+                return context.pipeline.addHandler(self.tlsHandler, position: .after(self))
+            }.always { _ in
+                print("QUICStateHandler[\(self.perspective)]::UserInboundEventTriggered::Done Reinstalling NIOSSLClientHandler")
+                self.updateIdleTimeout()
+            }
+
+        } else if let versionNegotiationFailed = event as? ConnectionChannelEvent.FailedVersionNegotiation {
+            print("QUICStateHandler[\(self.perspective)]::UserInboundEventTriggered::TODO::Handle Failed Version Negotiation!")
+            print(versionNegotiationFailed)
+            context.close(mode: .all, promise: nil)
+        }
+        // We consume these events. No need to pass it along.
+    }
+
+    private func updateIdleTimeout() {
+        if self.idleTimeout == .zero { self.idleTimeoutTask = nil; return }
+        if self.idleTimeoutTask != nil { self.idleTimeoutTask.cancel() }
+        self.idleTimeoutTask = self.storedContext.eventLoop.scheduleTask(in: self.idleTimeout, {
+            self.handleIdleTimeout()
+        })
+    }
+
+    private func handleIdleTimeout() {
+        guard self.state.hasBegunDisconnect == false else { return }
+        guard self.storedContext != nil else { return }
+        print("QUICStateHandler[\(self.perspective)]::We've Timed Out!")
+
+        if case .active = self.state.state {
+            let closeFrame = Frames.ConnectionClose(closeType: .quic, errorCode: VarInt(integerLiteral: 0), frameType: VarInt(integerLiteral: 0), reasonPhrase: "Idle Timeout")
+            var buf = ByteBuffer()
+            closeFrame.encode(into: &buf)
+            let short = ShortPacket(
+                header: GenericShortHeader(
+                    firstByte: 0b01000001,
+                    id: self.dcid,
+                    packetNumber: [0x00]
+                ),
+                payload: [closeFrame]
+            )
+            self.storedContext.writeAndFlush(self.wrapOutboundOut([short]), promise: nil)
+        }
+
+        try? self.state.sentConnectionClose()
+
+        self.tlsHandler.stopTLS(promise: nil)
+        self.storedContext.pipeline.removeHandler(self.tlsHandler, promise: nil)
+        self.storedContext.eventLoop.scheduleTask(in: .milliseconds(50)) {
+            self.storedContext.close(mode: .all, promise: nil)
+        }
     }
 }
 
