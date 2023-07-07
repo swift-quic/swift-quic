@@ -21,7 +21,23 @@ SwiftQuic is an open-source [Swift] implementation of the [QUIC] protocol.
 - The TLS Handshake uses a slightly modified version of `swift-nio-ssl` available [here](https://github.com/btoms20/swift-nio-ssl)
 - The main connection logic is handled in the `read` and `write` methods of the [Client](https://github.com/swift-quic/swift-quic/blob/develop/Sources/Quic/NIO/Connection/Handlers/ClientHandler.swift) and [Server](https://github.com/swift-quic/swift-quic/blob/develop/Sources/Quic/NIO/Connection/Handlers/ServerHandler.swift) Handlers for the time being (these will eventually be merged into a more generalized StateHandler). 
 
-### TODO's
+### Alpha (a working prototype) TODO's
+- [x] Version Negotiation
+- [ ] 0RTT Data
+- [x] Key Updates 
+    - [x] Respond to
+    - [ ] Initiate
+- [x] Idle Timeouts
+- [ ] ConnectionID 
+    - [ ] Issuance
+    - [ ] Retirement
+- [ ] Basic Flow Control (max data, max streams, etc)
+- [ ] Basic Connection Migration
+- [ ] Async API for accepting Connections
+- [ ] Async API for using Streams (open, close, tx, rx)
+
+### Beta (the great cleanup) TODO's
+- [ ] Rewrite Alpha (clean code from the ground up)
 - [ ] A proper / robust Handshake algorithm that handles versions negotiation, 0RTT data, etc...
 - [ ] A proper / robust ACK Handler / Emitter
 - [ ] A proper / robust Connection Muxer
@@ -29,9 +45,12 @@ SwiftQuic is an open-source [Swift] implementation of the [QUIC] protocol.
 - [ ] Connection State Management
 - [ ] Stream State Management
 - [ ] Connection and Stream termination / clean up
-- [ ] HTTP3 support
 - [ ] Connection and Stream API
 - [ ] ... Everything else 😅
+
+### HTTP3
+- [ ] HTTP3 support
+
 > There's loads to do, so if you can, please feel free to contribute to the project 🤝
 
 > If you have any questions or comments please start a discussion, we're happy to chat!
