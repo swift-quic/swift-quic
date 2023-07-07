@@ -179,7 +179,7 @@ final class QUICExternalDialClientTests: XCTestCase {
         let sslClientContext = try! NIOSSLContext(configuration: configuration)
 
         // Configure our Handlers
-        self.quicClientHandler = try! QUICStateHandler(SocketAddress(ipAddress: "127.0.0.1", port: 4242), perspective: .client, version: self.version, destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext)
+        self.quicClientHandler = try! QUICStateHandler(SocketAddress(ipAddress: "127.0.0.1", port: 4242), perspective: .client, versions: [self.version], destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext)
 
         // Configure Client Channel
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)

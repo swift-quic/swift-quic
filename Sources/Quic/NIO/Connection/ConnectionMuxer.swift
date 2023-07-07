@@ -78,6 +78,7 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
             if !channel.inList {
                 self.didReadChannels.append(channel)
             }
+
             // Otherwise we need to mux on the DCID of the Traffic packet
         } else if let connection = connections.first(where: { $0.value.hasActiveDCIDFor(envelope.data) }) {
             // Update the socket address in our dictionary
@@ -90,23 +91,32 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
             if !connection.value.inList {
                 self.didReadChannels.append(connection.value)
             }
+
             // If there are no matches for open connections, check to see if it's a valid InitialPacket and proceed to open a new connection
         } else {
             guard let firstByte = envelope.data.getBytes(at: 0, length: 1)?.first else { print("QuicConnectionMultiplexer::No Bytes Available"); return }
             guard PacketType(firstByte) == .Initial else { print("QuicConnectionMultiplexer::First Byte doesn't indicate an InitialPacket"); return }
             guard let version = envelope.data.getVersion(at: 1) else { print("QuicConnectionMultiplexer::Failed to read Version"); return }
-            guard isSupported(version: version) else { print("QuicConnectionMultiplexer::Unsupported Version \(version)"); return }
             guard let dcid = envelope.data.getConnectionID(at: 5) else { print("QuicConnectionMultiplexer::Failed to read DCID"); return }
             let scid: ConnectionID? = envelope.data.getConnectionID(at: 5 + dcid.lengthPrefixedBytes.count)
 
-            // Open a new connection
-            print("QuicConnectionMultiplexer::Opening new Channel for \(envelope.remoteAddress)")
+            // Ensure we support this version. Otherwise we respond with a VersionNegotiationPacket.
+            guard isSupported(version: version) else {
+                print("QuicConnectionMultiplexer::Unsupported Version `\(version)`")
+                print("Sending Version Negotiation Packet")
+                let vnPacket = VersionNegotiationPacket(destinationID: scid ?? ConnectionID(), sourceID: dcid)
+                let envelope = AddressedEnvelope(remoteAddress: envelope.remoteAddress, data: ByteBuffer(bytes: vnPacket.headerBytes + vnPacket.serializedPayload))
+                return context.writeAndFlush(self.wrapOutboundOut(envelope), promise: nil)
+            }
+
+            // Everything looks good, let's open a new connection...
+            print("Opening new Channel for \(envelope.remoteAddress)")
 
             let channel = QuicConnectionChannel(allocator: self.channel.allocator, parent: self.channel, multiplexer: self, remoteAddress: envelope.remoteAddress)
             self.connections[envelope.remoteAddress] = channel
 
             try! channel.pipeline.syncOperations.addHandlers([
-                QUICStateHandler(envelope.remoteAddress, perspective: .server, version: version, destinationID: dcid, sourceID: scid, tlsContext: self.tlsContext)
+                QUICStateHandler(envelope.remoteAddress, perspective: .server, versions: [version], destinationID: dcid, sourceID: scid, tlsContext: self.tlsContext)
             ])
             channel.configure(initializer: self.inboundConnectionStateInitializer, userPromise: nil)
             channel.pipeline.fireChannelActive()
@@ -933,5 +943,73 @@ extension QuicConnectionChannel: Equatable {
 extension QuicConnectionChannel: Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(ObjectIdentifier(self))
+    }
+}
+
+/// QUIC Connection Channel Events.
+enum ConnectionChannelEvent {
+
+    /// Traffic / Appliction Key Update Initiated
+    ///
+    /// Intended Event Propogation
+    /// ```
+    /// PacketProtectorHandler -> AckHandler -> StateHandler
+    /// ```
+    struct KeyUpdateInitiated: Hashable, Sendable {
+        /// The packetNumber at which the Key Update was initiated
+        public let packetNumber: UInt64
+
+        /// The initiator of the Key Update (client or server)
+        public let initiator: EndpointRole
+
+        public init(packetNumber: UInt64, initiator: EndpointRole) {
+            self.packetNumber = packetNumber
+            self.initiator = initiator
+        }
+    }
+
+    /// Traffic / Appliction Key Update Finished
+    ///
+    /// Intended Event Propogation
+    /// ```
+    /// AckHandler -> StateHandler
+    /// ```
+    struct KeyUpdateFinished: Hashable, Sendable {
+        /// The packetNumber at which the Key Update was completed
+        public let packetNumber: UInt64
+
+        public init(packetNumber: UInt64) {
+            self.packetNumber = packetNumber
+        }
+    }
+
+    /// Version Negotiation Event
+    ///
+    /// Intended Event Propogation
+    /// ```
+    /// PacketProtectorHandler -> StateHandler
+    /// ```
+    struct VersionNegotiated: Hashable, Sendable {
+        /// The Version that was negotiated
+        public let version: Version
+
+        public init(version: Version) {
+            self.version = version
+        }
+    }
+
+    /// Failed Version Negotiation Event
+    ///
+    /// Intended Event Propogation
+    /// ```
+    /// PacketProtectorHandler -> StateHandler
+    /// ```
+    struct FailedVersionNegotiation: Hashable, Sendable {
+        /// The error encountered while attempting to negotiate a support Version
+        public let error: String
+
+        public init(error: String) {
+            self.error = error
+        }
     }
 }

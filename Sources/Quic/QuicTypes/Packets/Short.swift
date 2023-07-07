@@ -34,6 +34,15 @@ struct GenericShortHeader: ShortHeader, NumberedHeader {
     mutating func setPacketNumber(_ pn: [UInt8]) {
         self.packetNumber = pn
     }
+
+    mutating func setKeyPhaseBit(_ kp: KeyPhase) {
+        switch kp {
+            case .yes:
+                self.firstByte |= kp.rawValue
+            case .not:
+                self.firstByte &= 0b11111011
+        }
+    }
 }
 
 struct ShortPacket: Packet, NumberedPacket {

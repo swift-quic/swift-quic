@@ -26,7 +26,7 @@ final class PacketProtectorHandlerTests: XCTestCase {
 
     override func setUp() {
         self.channel = EmbeddedChannel()
-        self.packetProtectorHandler = try! PacketProtectorHandler(initialDCID: self.odcid, scid: self.scid, version: .version1, perspective: .client, remoteAddress: SocketAddress(ipAddress: "127.0.0.1", port: 1))
+        self.packetProtectorHandler = try! PacketProtectorHandler(initialDCID: self.odcid, scid: self.scid, versions: [.version1], perspective: .client, remoteAddress: SocketAddress(ipAddress: "127.0.0.1", port: 1))
         XCTAssertNoThrow(try self.channel.pipeline.addHandler(self.packetProtectorHandler).wait())
 
         // this activates the channel
@@ -107,7 +107,7 @@ final class PacketProtectorHandlerTests2: XCTestCase {
 
     override func setUp() {
         self.channel = EmbeddedChannel()
-        self.packetProtectorHandler = try! PacketProtectorHandler(initialDCID: self.odcid, scid: self.scid, version: .version1, perspective: .client, remoteAddress: SocketAddress(ipAddress: "127.0.0.1", port: 1))
+        self.packetProtectorHandler = try! PacketProtectorHandler(initialDCID: self.odcid, scid: self.scid, versions: [.version1], perspective: .client, remoteAddress: SocketAddress(ipAddress: "127.0.0.1", port: 1))
         XCTAssertNoThrow(try self.channel.pipeline.addHandler(self.packetProtectorHandler).wait())
     }
 

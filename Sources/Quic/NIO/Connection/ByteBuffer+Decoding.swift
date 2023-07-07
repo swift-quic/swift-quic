@@ -375,6 +375,48 @@ extension ByteBuffer {
             return nil
         }
     }
+
+    mutating func readEncryptedQuicTrafficHeader(dcid: ConnectionID, using keys: PacketProtector) -> GenericShortHeader? {
+        // Grab the first byte
+        guard let protectedFirstByte = self.getBytes(at: self.readerIndex, length: 1)?.first else { print("No bytes available to Read"); return nil }
+        // Ensure the first byte indicates that this is an Initial Packet Type
+        guard HeaderForm(rawValue: protectedFirstByte & HeaderForm.mask) == .short else { print("Not a Traffic Packet"); return nil }
+        do {
+            // Get the Packet Length
+            let pno = 1 + dcid.length
+            guard let bytes = self.getBytes(at: self.readerIndex, length: self.readableBytes) else { print("Not Enough Bytes Available"); return nil }
+
+            let sampleOffset = pno + 4
+            guard let sample = self.getBytes(at: self.readerIndex + sampleOffset, length: 16) else { print("Not Enough Bytes Available For Sample"); return nil }
+            var hb = Array(bytes[..<(pno + 4)])
+            try keys.removeHeaderProtection(sample: sample, headerBytes: &hb, packetNumberOffset: pno)
+
+            var headerBuf = ByteBuffer(bytes: hb)
+            guard let firstByte = headerBuf.readBytes(length: 1)?.first, HeaderForm(rawValue: firstByte & HeaderForm.mask) == .short else { print("Not a TrafficPacket"); return nil }
+            guard dcid.rawValue == headerBuf.readBytes(length: dcid.length) else { print("Failed to consume DCID from Header"); return nil }
+            guard let packetNumber = headerBuf.readBytes(length: headerBuf.readableBytes) else { print("Failed to consume PacketNumber from Header"); return nil }
+
+            let header = GenericShortHeader(firstByte: firstByte, id: dcid, packetNumber: packetNumber)
+            self.moveReaderIndex(forwardBy: hb.count)
+
+            return header
+        } catch {
+            print("Failed to read header for Short Packet: \(error)")
+            return nil
+        }
+    }
+
+    mutating func readEncryptedQuicTrafficPayload(header: GenericShortHeader, using keys: PacketProtector) -> ShortPacket? {
+        do {
+            let decryptedPayload = try keys.decryptPayload(Array(self.readableBytesView), packetNumber: header.packetNumber, authenticatingData: header.bytes)
+            let packet = try ShortPacket(header: header, payload: decryptedPayload.parsePayloadIntoFrames().frames)
+            self.moveReaderIndex(forwardBy: decryptedPayload.count + keys.suite!.tagLength)
+            return packet
+        } catch {
+            print("Failed to decrypt payload for Short Packet: \(error)")
+            return nil
+        }
+    }
 }
 
 extension ByteBuffer {
@@ -575,6 +617,31 @@ extension ByteBuffer {
             return nil
         }
         return result
+    }
+
+    mutating func readVersionNegotiationPacket() -> VersionNegotiationPacket? {
+        self.rewindReaderOnNil { `self` -> VersionNegotiationPacket? in
+            // The first byte only tells us that it's a Long Form Header (1st bit, the last 7 bits are unused / artbitrary)
+            guard let firstByte = self.readBytes(length: 1)?.first else { return nil }
+            let form = HeaderForm(rawValue: firstByte & HeaderForm.mask)
+            guard case .long = form else { return nil }
+
+            // The fact that the Version is set to 0 is the indicating factor that this is a Version negotiation packet
+            guard let version = self.readVersion() else { return nil }
+            guard version.rawValue == 0 else { return nil }
+
+            guard let dcid = self.readConnectionID() else { return nil }
+            guard let scid = self.readConnectionID() else { return nil }
+
+            var supportedVersions: [Version] = []
+            while self.readableBytes > 0, let v = self.readVersion() {
+                supportedVersions.append(v)
+            }
+
+            guard self.readableBytes == 0 else { return nil }
+
+            return VersionNegotiationPacket(destinationID: dcid, sourceID: scid, supportedVersions: supportedVersions)
+        }
     }
 
     //    // https://www.rfc-editor.org/rfc/rfc9000.html#name-sample-variable-length-inte

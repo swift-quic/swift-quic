@@ -64,21 +64,11 @@ extension NumberedHeader {
     var packetNumberLengthByteCount: UInt8 {
         return UInt8(self.packetNumber.count)
     }
-}
 
-//extension LongHeader where Self:NumberedPacket {
-//    func bytes() -> [UInt8] {
-//        var bytes:[UInt8] = []
-//        bytes.append(self.firstByte)
-//        bytes.append(contentsOf: self.version.bytes)
-//        bytes.append(contentsOf: writeQuicVarInt(UInt64(self.destinationIDLength)))
-//        bytes.append(contentsOf: self.destinationID.rawValue)
-//        bytes.append(contentsOf: writeQuicVarInt(UInt64(self.sourceIDLength)))
-//        bytes.append(contentsOf: self.sourceID.rawValue)
-//        bytes.append(contentsOf: self.packetNumber)
-//        return bytes
-//    }
-//}
+    func packetNumberAsUInt64() -> UInt64 {
+        UInt64(bytes: (Array<UInt8>(repeating: 0, count: 8 - packetNumber.count) + packetNumber).reversed())
+    }
+}
 
 extension Header {
     var needsPacketProtection: Bool {
