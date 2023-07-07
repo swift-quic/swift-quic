@@ -24,11 +24,18 @@ SwiftQuic is an open-source [Swift] implementation of the [QUIC] protocol.
 ### Alpha (a working prototype) TODO's
 - [x] Version Negotiation
 - [ ] 0RTT Data
+- [ ] Stateless Resets
+- [ ] Packet handling
+    - [ ] Out-of-order packet buffering
+    - [ ] Drop invalid packets
+    - [ ] Drop duplicate packets
+    - [ ] Resend un-acked packets
 - [x] Key Updates 
     - [x] Respond to
     - [ ] Initiate
 - [x] Idle Timeouts
-- [ ] ConnectionID 
+- [ ] ConnectionID
+    - [ ] Generation
     - [ ] Issuance
     - [ ] Retirement
 - [ ] Basic Flow Control (max data, max streams, etc)
