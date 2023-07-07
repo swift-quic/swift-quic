@@ -29,12 +29,3 @@ extension EndpointRole {
         }
     }
 }
-
-extension EndpointRole {
-    var opposite:EndpointRole {
-        switch self {
-        case .client: return .server
-        case .server: return .client
-        }
-    }
-}
