@@ -137,4 +137,23 @@ struct QUICConnectionStateMachine {
 
         self.state = .handshaking(HandshakingState(previous: idleState))
     }
+
+    mutating func sentConnectionClose() throws {
+        switch self.state {
+            case .idle, .handshaking, .active, .receivedDisconnect:
+                self.state = .sentDisconnect
+            case .sentDisconnect:
+                print("Already Sent Disconnect")
+                throw Errors.invalidStateTransition
+        }
+    }
+
+    var hasBegunDisconnect: Bool {
+        switch self.state {
+            case .sentDisconnect, .receivedDisconnect:
+                return true
+            default:
+                return false
+        }
+    }
 }
