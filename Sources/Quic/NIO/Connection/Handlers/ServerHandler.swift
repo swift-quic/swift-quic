@@ -196,7 +196,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
 
                         //For the time being, lets strip out the ClientHello crypto frame and only send that down the pipeline...
                         // TODO: Ensure the CryptoFrame contains a ClientHello
-                        guard var clientHelloBytes = ByteBuffer(bytes: cryptoFrame.data).getTLSClientHello() else { context.fireErrorCaught(Errors.InvalidPacket); return }
+                        guard case .success(var clientHelloBytes) = ByteBuffer(bytes: cryptoFrame.data).getTLSClientHello() else { context.fireErrorCaught(Errors.InvalidPacket); return }
                         guard let clientHello = try? ClientHello(header: [], payload: &clientHelloBytes) else { context.fireErrorCaught(Errors.InvalidPacket); return }
                         print(clientHello)
                         print("Quic Params")
@@ -215,7 +215,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         if let initialPacket = packet as? InitialPacket {
                             print("QUICServerHandler::ChannelRead::Processing Initial Packet")
                             // This packet should only contain an ACK...
-                            guard let ack = initialPacket.payload.first as? Frames.ACK else { print("Expected an ACK, didn't get it"); return }
+                            guard let _ = initialPacket.payload.first as? Frames.ACK else { print("Expected an ACK, didn't get it"); return }
                             self.packetProtectorHandler.dropInitialKeys()
                         }
 
@@ -288,7 +288,7 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         // Create the Server Initial Packet
                         guard let cryptoFrame = buffer.readCryptoFrame() else { print("Failed to read ServerHello"); return }
 
-                        guard var serverHello = ByteBuffer(bytes: cryptoFrame.data).getTLSServerHello() else { print("QUICServerHandler::ChannelRead::Expected TLS ServerHello, didn't get it"); return }
+                        guard case .success(var serverHello) = ByteBuffer(bytes: cryptoFrame.data).getTLSServerHello() else { print("QUICServerHandler::ChannelRead::Expected TLS ServerHello, didn't get it"); return }
 
                         // Get our chosen cipher suite
                         guard let sh = try? ServerHello(header: [], payload: &serverHello) else { print("QUICServerHandler::Failed to parse ServerHello"); return }
@@ -313,10 +313,10 @@ final class QUICServerHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         // Splice the completeServerHanshake into parts
                         var serverHandshakeBuffer = ByteBuffer(bytes: completeServerHandshake.data)
                         print("Total Readable Bytes for ServerHandshake: \(serverHandshakeBuffer.readableBytes)")
-                        guard let encryptedExtensions = serverHandshakeBuffer.readTLSEncryptedExtensions() else { print("Failed to read encrypted extensions"); return }
-                        guard let certificate = serverHandshakeBuffer.readTLSCertificate() else { print("Failed to read certificate"); return }
-                        guard let certVerify = serverHandshakeBuffer.readTLSCertificateVerify() else { print("Failed to read certificate verify"); return }
-                        guard let handshakeFinished = serverHandshakeBuffer.readTLSHandshakeFinished() else { print("Failed to read handshake finished"); return }
+                        guard case .success(let encryptedExtensions) = serverHandshakeBuffer.readTLSEncryptedExtensions() else { print("Failed to read encrypted extensions"); return }
+                        guard case .success(let certificate) = serverHandshakeBuffer.readTLSCertificate() else { print("Failed to read certificate"); return }
+                        guard case .success(let certVerify) = serverHandshakeBuffer.readTLSCertificateVerify() else { print("Failed to read certificate verify"); return }
+                        guard case .success(let handshakeFinished) = serverHandshakeBuffer.readTLSHandshakeFinished() else { print("Failed to read handshake finished"); return }
                         print("Readable Bytes After Parsing: \(buffer.readableBytes)")
                         print("Cumulative parts: \(encryptedExtensions.count + certificate.count + certVerify.count + handshakeFinished.count)")
                         // TODO: Update our DCID and SCID

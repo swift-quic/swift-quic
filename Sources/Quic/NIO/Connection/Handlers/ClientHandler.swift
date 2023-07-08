@@ -215,11 +215,11 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         guard serverInitial.payload.count >= 2 else { print("Expected ACK and Crypto Frames in Server Initial: \(serverInitial.payload)"); return }
 
                         // We expect an ACK frame
-                        guard let ack = serverInitial.payload[0] as? Frames.ACK else { print("QUICClientHandler::ChannelRead::Expected ACK Frame, didn't get it"); return }
+                        guard let _ = serverInitial.payload[0] as? Frames.ACK else { print("QUICClientHandler::ChannelRead::Expected ACK Frame, didn't get it"); return }
                         guard let cryptoFrame = serverInitial.payload[1] as? Frames.Crypto else { print("QUICClientHandler::ChannelRead::Expected Crypto Frame, didn't get it"); return }
 
                         // ServerHello
-                        guard var serverHello = ByteBuffer(bytes: cryptoFrame.data).getTLSServerHello() else { print("QUICClientHandler::ChannelRead::Expected TLS ServerHello, didn't get it"); return }
+                        guard case .success(var serverHello) = ByteBuffer(bytes: cryptoFrame.data).getTLSServerHello() else { print("QUICClientHandler::ChannelRead::Expected TLS ServerHello, didn't get it"); return }
                         if serverHello.count != cryptoFrame.data.count { print("More than just a Server Hello Frame!") }
 
                         // Get our cipher suite
@@ -259,8 +259,8 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         // TODO: Ensure this crypto frame contains the TLS Encrypted Extensions and the Certificate
 
                         var frameBuf = ByteBuffer(bytes: cryptoFrame.data)
-                        guard var encryptedExtensions = frameBuf.readTLSEncryptedExtensions() else { print("QUICClientHandler::ChannelRead::Expected EncryptedExtensions Frame, didn't get it"); return }
-                        guard let certificate = frameBuf.readTLSCertificate() else { print("QUICClientHandler::ChannelRead::Expected Certificate Frame, didn't get it"); return }
+                        guard case .success(let encryptedExtensions) = frameBuf.readTLSEncryptedExtensions() else { print("QUICClientHandler::ChannelRead::Expected EncryptedExtensions Frame, didn't get it"); return }
+                        guard case .success(let certificate) = frameBuf.readTLSCertificate() else { print("QUICClientHandler::ChannelRead::Expected Certificate Frame, didn't get it"); return }
 
                         guard let quicParamsOffset = encryptedExtensions.firstRange(of: [0x00, 0x39]) ?? encryptedExtensions.firstRange(of: [0xff, 0xa5]) else { fatalError("Failed to extract QUIC Params") }
                         var extBuf = ByteBuffer(bytes: encryptedExtensions.dropFirst(quicParamsOffset.startIndex + 4))
@@ -289,12 +289,12 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         Frames.Crypto(offset: VarInt(integerLiteral: 0), data: certificate).encode(into: &cryptoBuf2)
                         context.fireChannelRead(self.wrapInboundOut(cryptoBuf2))
 
-                        if let certVerify = frameBuf.readTLSCertificateVerify() {
+                        if case .success(let certVerify) = frameBuf.readTLSCertificateVerify() {
                             var cryptoBuf3 = ByteBuffer()
                             Frames.Crypto(offset: VarInt(integerLiteral: 0), data: certVerify).encode(into: &cryptoBuf3)
                             context.fireChannelRead(self.wrapInboundOut(cryptoBuf3))
 
-                            if let finished = frameBuf.readTLSHandshakeFinished() {
+                            if case .success(let finished) = frameBuf.readTLSHandshakeFinished() {
                                 var cryptoBuf4 = ByteBuffer()
                                 Frames.Crypto(offset: VarInt(integerLiteral: 0), data: finished).encode(into: &cryptoBuf4)
                                 context.fireChannelRead(self.wrapInboundOut(cryptoBuf4))
@@ -347,14 +347,14 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                         print("QUICClientHandler::PartialCryptoBuffer -> \(self.partialCryptoBuffer.readableBytesView.hexString)")
 
                         // We might have already processed the certVerify in the previous datagram...
-                        if let certVerify = partialCryptoBuffer.readTLSCertificateVerify() {
+                        if case .success(let certVerify) = self.partialCryptoBuffer.readTLSCertificateVerify() {
                             var cryptoBuf1 = ByteBuffer()
                             Frames.Crypto(offset: VarInt(integerLiteral: 0), data: certVerify).encode(into: &cryptoBuf1)
                             context.fireChannelRead(self.wrapInboundOut(cryptoBuf1))
                         }
 
                         // But we are expecting at least the handshakeFinished frame
-                        guard let handshakeFinished = partialCryptoBuffer.readTLSHandshakeFinished() else { print("QUICClientHandler::ChannelRead::Expected HandshakeFinished Frame, didn't get it"); return }
+                        guard case .success(let handshakeFinished) = self.partialCryptoBuffer.readTLSHandshakeFinished() else { print("QUICClientHandler::ChannelRead::Expected HandshakeFinished Frame, didn't get it"); return }
 
                         var cryptoBuf2 = ByteBuffer()
                         Frames.Crypto(offset: VarInt(integerLiteral: 0), data: handshakeFinished).encode(into: &cryptoBuf2)
@@ -562,7 +562,7 @@ final class QUICClientHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
                 //print(acks)
 
                 // Close the connection
-                let closeFrame = Frames.ConnectionClose(closeType: .quic, errorCode: VarInt(integerLiteral: 0), frameType: nil, reasonPhrase: "")
+                //let closeFrame = Frames.ConnectionClose(closeType: .quic, errorCode: VarInt(integerLiteral: 0), frameType: nil, reasonPhrase: "")
                 // If we have an outstanding ACK for out traffic epoch, include it...
                 //if let tACK = ackManager.getACK(for: .Application) ?? acks.traffic { frames.insert(tACK, at: 0) }
                 //let closeStream = Frames.Stream(streamID: StreamID(rawValue: VarInt(integerLiteral: 0)), offset: VarInt(integerLiteral: 4), length: VarInt(integerLiteral: 0), fin: true, data: ByteBuffer())
