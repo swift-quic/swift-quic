@@ -293,7 +293,7 @@ extension ByteBuffer {
         guard let dcid = headerBuf.readConnectionID() else { print("Failed to consume DCID from Header"); return nil }
         guard let scid = headerBuf.readConnectionID() else { print("Failed to consume SCID from Header"); return nil }
         guard let token = headerBuf.readQuicVarIntLengthPrefixedBytes() else { print("Failed to consume Token from Header"); return nil }
-        guard let packetLength = headerBuf.readQuicVarInt() else { print("Failed to consume PacketLength from Header"); return nil }
+        guard headerBuf.readQuicVarInt() != nil else { print("Failed to consume PacketLength from Header"); return nil }
         guard let packetNumber = headerBuf.readBytes(length: headerBuf.readableBytes) else { print("Failed to consume PacketNumber from Header"); return nil }
 
         let initialHeader = InitialHeader(version: version, destinationID: dcid, sourceID: scid, token: token, packetNumber: packetNumber)
@@ -329,7 +329,7 @@ extension ByteBuffer {
             guard let version = headerBuf.readVersion() else { print("Failed to consume Version from Header"); return nil }
             guard let dcid = headerBuf.readConnectionID() else { print("Failed to consume DCID from Header"); return nil }
             guard let scid = headerBuf.readConnectionID() else { print("Failed to consume SCID from Header"); return nil }
-            guard let packetLength = headerBuf.readQuicVarInt() else { print("Failed to consume PacketLength from Header"); return nil }
+            guard headerBuf.readQuicVarInt() != nil else { print("Failed to consume PacketLength from Header"); return nil }
             guard let packetNumber = headerBuf.readBytes(length: headerBuf.readableBytes) else { print("Failed to consume PacketNumber from Header"); return nil }
 
             let handshakeHeader = HandshakeHeader(version: version, destinationID: dcid, sourceID: scid, packetNumber: packetNumber)
