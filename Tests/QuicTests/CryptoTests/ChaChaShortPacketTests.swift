@@ -50,7 +50,7 @@ final class ChaChaShortPacketTests: XCTestCase {
 
         struct MyShortPacket: Packet, NumberedPacket {
             let header: MyShortHeader
-            let payload: [Frame]
+            let payload: [any Frame]
         }
 
         let largestAcked: UInt64 = 645_971_956 // Any lower and we'd have to send a 4 byte packet number
