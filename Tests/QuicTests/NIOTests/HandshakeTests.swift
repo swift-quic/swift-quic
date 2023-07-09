@@ -53,7 +53,7 @@ final class QUICHandshakeTests: XCTestCase {
     let version: Version = .version1
     var dcid: ConnectionID!
     var scid: ConnectionID!
-    fileprivate var quicClientHandler: QUICClientHandler!
+    fileprivate var quicClientHandler: QUICStateHandler!
     fileprivate var clientErrorHandler: ErrorEventLogger!
     fileprivate var clientQuiesceEventRecorder: QuiesceEventRecorder!
 
@@ -135,7 +135,7 @@ final class QUICHandshakeTests: XCTestCase {
         let sslClientContext = try! NIOSSLContext(configuration: configuration)
 
         // Client QUIC State Handler
-        let clientHandler = try! QUICClientHandler(SocketAddress(ipAddress: "127.0.0.1", port: 0), versions: [self.version], destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext)
+        let clientHandler = try! QUICStateHandler(SocketAddress(ipAddress: "127.0.0.1", port: 0), perspective: .client, versions: [self.version], destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext, idleTimeout: .milliseconds(200))
 
         // Configure Server TLS
         var serverConfiguration = TLSConfiguration.makeServerConfiguration(
@@ -143,7 +143,7 @@ final class QUICHandshakeTests: XCTestCase {
             privateKey: .privateKey(try! NIOSSLPrivateKey(bytes: Array(self.privKey.utf8), format: .pem))
         )
         serverConfiguration.minimumTLSVersion = .tlsv13
-        serverConfiguration.applicationProtocols = ["echo"]
+        serverConfiguration.applicationProtocols = ["h3", "test", "echo"]
         serverConfiguration.renegotiationSupport = .none
         serverConfiguration.certificateVerification = .none
 
@@ -162,7 +162,7 @@ final class QUICHandshakeTests: XCTestCase {
 
         // Configure Server Channel
         // TODO: We should install our Muxer here instead of the UDPClientHandler
-        self.quicServer = QuicConnectionMultiplexer(channel: self.backToBack.server, tlsContext: sslServerContext, inboundConnectionInitializer: nil)
+        self.quicServer = QuicConnectionMultiplexer(channel: self.backToBack.server, tlsContext: sslServerContext, idleTimeout: .zero, inboundConnectionInitializer: nil)
         self.serverQuiesceEventRecorder = QuiesceEventRecorder()
         self.serverErrorHandler = ErrorEventLogger()
         XCTAssertNoThrow(try self.backToBack.server.pipeline.addHandler(self.quicServer).wait())
@@ -195,75 +195,10 @@ final class QUICHandshakeTests: XCTestCase {
     /// This test asserts that when we initialize a QUIC Client Channel, BoringSSL generates and write the client hello crypto frame upon channel activation.
     /// Takes about 5ms to generate a Client InitialPacket
     func testHandshake() throws {
-        throw XCTSkip("This integration test is skipped by default")
-
-        // Ensure our Client is generating an InitialPacket containing a ClientHello upon Channel Activation
-        let firstClientDatagram = try backToBack.client.readOutbound(as: AddressedEnvelope<ByteBuffer>.self)
-
-        print(firstClientDatagram!.data.readableBytesView.hexString)
-
-        // Pass the AddressedEnvelope containing the client's InitialPacket into our Server
-        try self.backToBack.server.writeInbound(firstClientDatagram)
-
-        // Ensure our Server's epoch has transitioned into Handshake
-
-        // Read the first outbound datagram containing the Server's InitialPacket (which includes the ServerHello Crypto Frame, ACK Frame) and the first HandshakePacket
-        guard let firstServerDatagram = try backToBack.server.readOutbound(as: AddressedEnvelope<ByteBuffer>.self) else { return XCTFail("Failed to read Server's first datagram") }
-
-        // Feed the first server datagram into our ClientChannel
-        try self.backToBack.client.writeInbound(firstServerDatagram)
-
-        // Read the second outbound datagram containing the second HandshakePacket (which includes the CertVerify Crypto Frame)
-        guard let secondServerDatagram = try backToBack.server.readOutbound(as: AddressedEnvelope<ByteBuffer>.self) else { return XCTFail("Failed to read Server's second datagram") }
-
-        // Feed the second server datagram into our ClientChannel
-        try self.backToBack.client.writeInbound(secondServerDatagram)
-
-        // Ensure our Client's epoch has transitioned into Handshake Complete
-
-        // Read the Client's second outbound datagram (which contains the Handshake complete)
-        guard let secondClientDatagram = try backToBack.client.readOutbound(as: AddressedEnvelope<ByteBuffer>.self) else { return XCTFail("Failed to read Client's second datagram") }
-
-        // Feed the Client's Second Datagram into the server (this contains Initial and Handshake ACKs)
-        try self.backToBack.server.writeInbound(secondClientDatagram)
-
-        // We need to yield to the client channel here, it takes a second for NIOSSL to generate the traffic keys...
-        self.backToBack.loop.run()
-        guard let thirdClientDatagram = try backToBack.client.readOutbound(as: AddressedEnvelope<ByteBuffer>.self) else { return XCTFail("Failed to read Client's third datagram") }
-        // Feed the Client's Third Datagram into the server (this contains the Handshake finished crypto frame)
-        try self.backToBack.server.writeInbound(thirdClientDatagram)
-
-        guard let thirdServerDatagram = try backToBack.server.readOutbound(as: AddressedEnvelope<ByteBuffer>.self) else { return XCTFail("Failed to read Server's third datagram") }
-
-        try self.backToBack.client.writeInbound(thirdServerDatagram)
-
-        // Ensure the Server thinks the Handshake is complete
-
-        // Ensure the Client thinks the Handshake is complete
-
-        // Ensure the Traffic Keys match
-
-        // Ensure the Initial and Handshake Keys were dropped
-
-        // Ensure the TLS Handler becomes passive
-
-        print("Done???")
+        try self.backToBack.interactInMemory(for: .seconds(1), withTimeStep: .microseconds(10))
 
         // Close our embedded channels
-        try self.backToBack.client.close(mode: .all).wait()
-        try self.backToBack.server.close(mode: .all).wait()
-    }
-
-    /// This test asserts that when we initialize a QUIC Client Channel, BoringSSL generates and write the client hello crypto frame upon channel activation.
-    /// Takes about 5ms to generate a Client InitialPacket
-    func testHandshake2() throws {
-        throw XCTSkip("This integration test is skipped by default")
-
-        try self.backToBack.interactInMemory()
-
-        print("Done???")
-        // Close our embedded channels
-        try self.backToBack.client.close(mode: .all).wait()
+        try? self.backToBack.client.close(mode: .all).wait()
         try self.backToBack.server.close(mode: .all).wait()
     }
 }
@@ -324,6 +259,34 @@ final class BackToBackEmbeddedChannel {
             if let serverMsg = serverDatum {
                 try self.client.writeInbound(serverMsg)
                 workToDo = true
+            }
+        }
+    }
+
+    /// This helps get around our issue where we need to yeild to NIOSSL while it's generating keys...
+    func interactInMemory(for totalTime: TimeAmount, withTimeStep: TimeAmount = .microseconds(10)) throws {
+        guard withTimeStep < totalTime else { throw Errors.InvalidState }
+        let timestep = withTimeStep
+        var now: NIODeadline = .uptimeNanoseconds(0)
+
+        while now.uptimeNanoseconds < totalTime.nanoseconds {
+            self.loop.advanceTime(by: timestep)
+            now = now + timestep
+
+            self.loop.run()
+            let clientDatum = try self.client.readOutbound(as: DataType.self)
+            let serverDatum = try self.server.readOutbound(as: DataType.self)
+
+            // Reads may trigger errors. The write case is automatic.
+            try self.client.throwIfErrorCaught()
+            try self.server.throwIfErrorCaught()
+
+            if let clientMsg = clientDatum {
+                try self.server.writeInbound(clientMsg)
+            }
+
+            if let serverMsg = serverDatum {
+                try self.client.writeInbound(serverMsg)
             }
         }
     }
