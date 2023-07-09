@@ -47,9 +47,9 @@ struct GenericShortHeader: ShortHeader, NumberedHeader {
 
 struct ShortPacket: Packet, NumberedPacket {
     var header: GenericShortHeader
-    var payload: [Frame]
+    var payload: [any Frame]
 
-    init(header: GenericShortHeader, payload: [Frame]) {
+    init(header: GenericShortHeader, payload: [any Frame]) {
         self.header = header
         self.payload = payload
     }
