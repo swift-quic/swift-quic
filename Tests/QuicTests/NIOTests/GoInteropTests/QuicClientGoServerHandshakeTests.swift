@@ -157,13 +157,10 @@ final class QUICExternalDialClientTests: XCTestCase {
     var group: MultiThreadedEventLoopGroup!
     var client: DatagramBootstrap!
     var channel: Channel!
-    var clientInitialBytes: ByteBuffer?
     let version: Version = .version1
     var dcid: ConnectionID!
     var scid: ConnectionID!
-    fileprivate var quicClientHandler: QUICClientHandler!
-    fileprivate var clientErrorHandler: ErrorEventLogger!
-    fileprivate var clientQuiesceEventRecorder: QuiesceEventRecorder!
+    fileprivate var quicClientHandler: QUICStateHandler!
 
     override func setUp() {
         // Configure QUIC Params
@@ -182,9 +179,7 @@ final class QUICExternalDialClientTests: XCTestCase {
         let sslClientContext = try! NIOSSLContext(configuration: configuration)
 
         // Configure our Handlers
-        self.quicClientHandler = try! QUICClientHandler(SocketAddress(ipAddress: "127.0.0.1", port: 4242), versions: [.version1], destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext)
-        self.clientQuiesceEventRecorder = QuiesceEventRecorder()
-        self.clientErrorHandler = ErrorEventLogger()
+        self.quicClientHandler = try! QUICStateHandler(SocketAddress(ipAddress: "127.0.0.1", port: 4242), perspective: .client, versions: [self.version], destinationID: self.dcid, sourceID: self.scid, tlsContext: sslClientContext, idleTimeout: .milliseconds(200))
 
         // Configure Client Channel
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
@@ -193,8 +188,6 @@ final class QUICExternalDialClientTests: XCTestCase {
             .channelInitializer { channel in
                 channel.pipeline.addHandlers([
                     self.quicClientHandler
-                    //self.clientErrorHandler,
-                    //self.clientQuiesceEventRecorder
                 ])
             }
     }
@@ -205,11 +198,7 @@ final class QUICExternalDialClientTests: XCTestCase {
             self.channel = nil
         }
 
-        self.clientInitialBytes = nil
-
         self.quicClientHandler = nil
-        self.clientQuiesceEventRecorder = nil
-        self.clientErrorHandler = nil
 
         self.client = nil
 
@@ -217,25 +206,12 @@ final class QUICExternalDialClientTests: XCTestCase {
         self.group = nil
     }
 
-    /// This test asserts that when we initialize a QUIC Client Channel, BoringSSL generates and write the client hello crypto frame upon channel activation.
-    /// Takes about 5ms to generate a Client InitialPacket
     func testHandshake() throws {
         throw XCTSkip("This integration test is skipped by default")
-        
-        // Bind to our UDP port (this activates the Handlers and kicks off a connection)
-        self.channel = try! self.client.connect(host: "127.0.0.1", port: 6121).wait()
 
-        // TODO: Figure out how to timeout here...
-        try self.channel.closeFuture.wait()
-    }
-
-    func testHandshake2() throws {
-        throw XCTSkip("This integration test is skipped by default")
-        
         // Bind to our UDP port (this activates the Handlers and kicks off a connection)
         self.channel = try! self.client.connect(host: "127.0.0.1", port: 4242).wait()
 
-        // TODO: Figure out how to timeout here...
         try self.channel.closeFuture.wait()
     }
 }
