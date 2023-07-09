@@ -46,10 +46,12 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
     private var didReadChannels: ConnectionChannelList = ConnectionChannelList()
     private var flushState: FlushState = .notReading
     private var tlsContext: NIOSSLContext
+    private var idleTimeout: TimeAmount
 
-    public init(channel: Channel, tlsContext: NIOSSLContext, inboundConnectionInitializer initializer: ((Channel) -> EventLoopFuture<Void>)?) {
+    public init(channel: Channel, tlsContext: NIOSSLContext, idleTimeout: TimeAmount = .seconds(3), inboundConnectionInitializer initializer: ((Channel) -> EventLoopFuture<Void>)?) {
         self.channel = channel
         self.tlsContext = tlsContext
+        self.idleTimeout = idleTimeout
         self.inboundConnectionStateInitializer = initializer
     }
 
@@ -66,15 +68,14 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
 
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let envelope = unwrapInboundIn(data)
-        print("Inbound Data From \(envelope.remoteAddress):")
-        print(Array(envelope.data.readableBytesView).hexString)
+        print("QuicConnectionMultiplexer::Inbound Data From \(envelope.remoteAddress) - \(envelope.data.readableBytes) bytes")
 
         self.flushState.startReading()
 
         // Try and quickly mux on the hashed socket address
         if let channel = connections[envelope.remoteAddress] {
             // Forward the data along
-            print("Forwarding data along to Connection @ \(envelope.remoteAddress)")
+            print("QuicConnectionMultiplexer::Forwarding data along to Connection @ \(envelope.remoteAddress)")
             channel.receiveInboundFrame(envelope.data)
             if !channel.inList {
                 self.didReadChannels.append(channel)
@@ -83,11 +84,11 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
             // Otherwise we need to mux on the DCID of the Traffic packet
         } else if let connection = connections.first(where: { $0.value.hasActiveDCIDFor(envelope.data) }) {
             // Update the socket address in our dictionary
-            print("Active Migration for DCID from \(connection.key) -> \(envelope.remoteAddress). Updating SocketAddress.")
+            print("QuicConnectionMultiplexer::Active Migration for DCID from \(connection.key) -> \(envelope.remoteAddress). Updating SocketAddress.")
             self.connections.removeValue(forKey: connection.key)
             self.connections[envelope.remoteAddress] = connection.value
             // Forward the data along
-            print("Forwarding data along to Connection @ \(envelope.remoteAddress)")
+            print("QuicConnectionMultiplexer::Forwarding data along to Connection @ \(envelope.remoteAddress)")
             connection.value.receiveInboundFrame(envelope.data)
             if !connection.value.inList {
                 self.didReadChannels.append(connection.value)
@@ -104,20 +105,20 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
             // Ensure we support this version. Otherwise we respond with a VersionNegotiationPacket.
             guard isSupported(version: version) else {
                 print("QuicConnectionMultiplexer::Unsupported Version `\(version)`")
-                print("Sending Version Negotiation Packet")
+                print("QuicConnectionMultiplexer::Sending Version Negotiation Packet")
                 let vnPacket = VersionNegotiationPacket(destinationID: scid ?? ConnectionID(), sourceID: dcid)
                 let envelope = AddressedEnvelope(remoteAddress: envelope.remoteAddress, data: ByteBuffer(bytes: vnPacket.headerBytes + vnPacket.serializedPayload))
                 return context.writeAndFlush(self.wrapOutboundOut(envelope), promise: nil)
             }
 
             // Everything looks good, let's open a new connection...
-            print("Opening new Channel for \(envelope.remoteAddress)")
+            print("QuicConnectionMultiplexer::Opening new Channel for \(envelope.remoteAddress)")
 
             let channel = QuicConnectionChannel(allocator: self.channel.allocator, parent: self.channel, multiplexer: self, remoteAddress: envelope.remoteAddress)
             self.connections[envelope.remoteAddress] = channel
 
             try! channel.pipeline.syncOperations.addHandlers([
-                QUICServerHandler(envelope.remoteAddress, version: version, destinationID: dcid, sourceID: scid, tlsContext: self.tlsContext)
+                QUICStateHandler(envelope.remoteAddress, perspective: .server, versions: [version], destinationID: dcid, sourceID: scid, tlsContext: self.tlsContext, idleTimeout: self.idleTimeout)
             ])
             channel.configure(initializer: self.inboundConnectionStateInitializer, userPromise: nil)
             channel.pipeline.fireChannelActive()
@@ -158,8 +159,7 @@ final class QuicConnectionMultiplexer: ChannelInboundHandler, ChannelOutboundHan
     public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         /* for now just forward */
         let envelope = self.unwrapOutboundIn(data)
-        print("Sending \(envelope.remoteAddress):")
-        print(Array(envelope.data.readableBytesView).hexString)
+        print("QUICConnectionMultiplexer::Sending \(envelope.remoteAddress) -> \(envelope.data.readableBytes) bytes")
         context.write(data, promise: promise)
     }
 
@@ -221,8 +221,8 @@ extension QuicConnectionMultiplexer {
     }
 
     internal func childChannelWrite(_ envelope: AddressedEnvelope<ByteBuffer>, promise: EventLoopPromise<Void>?) {
-        print("Sending \(envelope.remoteAddress):")
-        print(Array(envelope.data.readableBytesView).hexString)
+        //print("Sending \(envelope.remoteAddress):")
+        //print(Array(envelope.data.readableBytesView).hexString)
         self.context.write(self.wrapOutboundOut(envelope), promise: promise)
     }
 
@@ -409,7 +409,7 @@ internal final class QuicConnectionChannel: Channel, ChannelCore {
         // go much further.
         //self.autoRead = false
         self._pipeline = ChannelPipeline(channel: self)
-        print("UDP Stream Channel Initialized (bound to remoteAddress: \(remoteAddress.description))")
+        print("QuicConnectionChannel::UDP Stream Channel Initialized (bound to remoteAddress: \(remoteAddress.description))")
     }
 
     func configure(initializer: ((Channel) -> EventLoopFuture<Void>)?, userPromise promise: EventLoopPromise<Channel>?) {
@@ -431,7 +431,7 @@ internal final class QuicConnectionChannel: Channel, ChannelCore {
     private func postInitializerActivate(promise: EventLoopPromise<Channel>?) {
         // This force unwrap is safe as parent is assigned in the initializer, and never unassigned.
         // If parent is not active, we expect to receive a channelActive later.
-        print("PostInitializerActivate::ParentActive == \(self.parent?.isActive)")
+        print("QuicConnectionChannel::PostInitializerActivate::ParentActive == \(String(describing: self.parent?.isActive))")
         if self.parent!.isActive {
             self.modifyingState { $0.activate() }
             self.pipeline.fireChannelActive()
@@ -725,31 +725,8 @@ private extension QuicConnectionChannel {
             let frame = self.pendingReads.removeFirst()
 
             let anyStreamData = NIOAny(frame)
-            //let dataLength: Int?
-
-//            switch self.streamDataType {
-//            case .frame:
-//                anyStreamData = NIOAny(frame)
-//            case .framePayload:
-//                anyStreamData = NIOAny(frame.payload)
-//            }
-
-//            switch frame.payload {
-//            case .data(let data):
-//                dataLength = data.data.readableBytes
-//            default:
-//                dataLength = nil
-//            }
 
             self.pipeline.fireChannelRead(anyStreamData)
-
-            //if let size = dataLength, let increment = self.windowManager.bufferedFrameEmitted(size: size) {
-            //    // To have a pending read, we must have a stream ID.
-            //    let frame = HTTP2Frame(streamID: self.streamID!, payload: .windowUpdate(windowSizeIncrement: increment))
-            //    self.receiveOutboundFrame(frame, promise: nil)
-            //    // This flush should really go away, but we need it for now until we sort out window management.
-            //    self.multiplexer.childChannelFlush()
-            //}
         }
         self.pipeline.fireChannelReadComplete()
     }
@@ -761,22 +738,8 @@ private extension QuicConnectionChannel {
             return
         }
 
-        // Get a streamID from the multiplexer if we haven't got one already.
-        //if self.streamID == nil {
-        //    self.streamID = self.multiplexer.requestStreamID(forChannel: self)
-        //}
-
         while self.pendingWrites.hasMark {
             let (streamData, promise) = self.pendingWrites.removeFirst()
-            //let frame: ByteBuffer
-
-            //switch streamData {
-            //case .frame(let f):
-            //    frame = f
-            //case .framePayload(let payload):
-            //    // This unwrap is okay: we just ensured that `self.streamID` was set above.
-            //    frame = HTTP2Frame(streamID: self.streamID!, payload: payload)
-            //}
 
             self.receiveOutboundFrame(streamData, promise: promise)
         }
@@ -806,11 +769,11 @@ extension QuicConnectionChannel {
 
 extension QuicConnectionChannel {
     public var description: String {
-        return "UDPStreamChannel(address: \(String(describing: self.remoteAddress)), isActive: \(self.isActive), isWritable: \(self.isWritable))"
+        return "QuicConnectionChannel(address: \(String(describing: self.remoteAddress)), isActive: \(self.isActive), isWritable: \(self.isWritable))"
     }
 }
 
-// MARK: - Functions used to communicate between the `UDPStreamMultiplexer` and the `UDPStreamChannel`.
+// MARK: - Functions used to communicate between the `QuicConnectionMuxer` and the `QuicConnectionChannel`.
 
 private extension QuicConnectionChannel {
     /// Called when a frame is received from the network.
@@ -818,7 +781,7 @@ private extension QuicConnectionChannel {
     /// - parameters:
     ///     - frame: The `QUICFrame` received from the network.
     func receiveInboundFrame(_ frame: ByteBuffer) {
-        print("UDPStreamChannel::ReceiveInboundFrame::State == \(self.state)")
+        print("QuicConnectionChannel::ReceiveInboundFrame::State == \(self.state)")
         guard self.state != .closed else {
             // Do nothing
             return
