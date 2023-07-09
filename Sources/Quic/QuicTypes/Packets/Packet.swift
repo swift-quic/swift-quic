@@ -18,7 +18,7 @@ import NIOCore
 protocol Packet: Sendable, CustomStringConvertible {
     associatedtype ConcreteHeader: Header
     var header: ConcreteHeader { get }
-    var payload: [Frame] { get }
+    var payload: [any Frame] { get }
 }
 
 extension Packet {
