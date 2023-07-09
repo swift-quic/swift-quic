@@ -75,6 +75,12 @@ final class ACKChannelHandler: ChannelDuplexHandler {
             switch packets[i].type {
                 case .Initial:
                     guard var initialPacket = packets[i] as? InitialPacket else { context.fireErrorCaught(Errors.InvalidPacket); return }
+                    // Inject ACK if necessary
+                    if let ack = self.manager.getACK(for: .Initial) {
+                        print("AckChannelHandler::Write::Injecting ACK into InitialPacket")
+                        initialPacket.payload.insert(ack, at: 0)
+                    }
+                    guard !initialPacket.payload.isEmpty else { print("AckChannelHandler::Write::Dropping Empty InitialPacket"); return }
                     // Set the packet number
                     let pn = self.manager.nextPacketNumber(for: .Initial)
                     print("AckChannelHandler::Write::Setting Packet Number `\(pn)` for InitialPacket")
@@ -83,38 +89,35 @@ final class ACKChannelHandler: ChannelDuplexHandler {
                     } else {
                         initialPacket.header.setPacketNumber(pn.bytes(minBytes: 1, bigEndian: true))
                     }
-                    // Inject ACK if necessary
-                    if let ack = self.manager.getACK(for: .Initial) {
-                        print("AckChannelHandler::Write::Injecting ACK into InitialPacket")
-                        initialPacket.payload.insert(ack, at: 0)
-                    }
                     // Update the packet
                     packets[i] = initialPacket
 
                 case .Handshake:
                     guard var handshakePacket = packets[i] as? HandshakePacket else { context.fireErrorCaught(Errors.InvalidPacket); return }
-                    let pn = self.manager.nextPacketNumber(for: .Handshake)
-                    print("AckChannelHandler::Write::Setting Packet Number `\(pn)` for HandshakePacket")
-                    // Set the packet number
-                    handshakePacket.header.setPacketNumber(pn.bytes(minBytes: 1, bigEndian: true))
                     // Inject ACK if necessary
                     if let ack = self.manager.getACK(for: .Handshake) {
                         print("AckChannelHandler::Write::Injecting ACK into HandshakePacket")
                         handshakePacket.payload.insert(ack, at: 0)
                     }
+                    guard !handshakePacket.payload.isEmpty else { print("AckChannelHandler::Write::Dropping Empty HandshakePacket"); return }
+                    let pn = self.manager.nextPacketNumber(for: .Handshake)
+                    print("AckChannelHandler::Write::Setting Packet Number `\(pn)` for HandshakePacket")
+                    // Set the packet number
+                    handshakePacket.header.setPacketNumber(pn.bytes(minBytes: 1, bigEndian: true))
                     // Update the packet
                     packets[i] = handshakePacket
                 case .Short:
                     guard var trafficPacket = packets[i] as? ShortPacket else { context.fireErrorCaught(Errors.InvalidPacket); return }
-                    let pn = self.manager.nextPacketNumber(for: .Application)
-                    print("AckChannelHandler::Write::Setting Packet Number `\(pn)` for TrafficPacket")
-                    // Set the packet number
-                    trafficPacket.header.setPacketNumber(pn.bytes(minBytes: 2, bigEndian: true))
                     // Inject ACK if necessary
                     if let ack = self.manager.getACK(for: .Application) {
                         print("AckChannelHandler::Write::Injecting ACK into TrafficPacket")
                         trafficPacket.payload.insert(ack, at: 0)
                     }
+                    guard !trafficPacket.payload.isEmpty else { print("AckChannelHandler::Write::Dropping Empty TrafficPacket"); return }
+                    let pn = self.manager.nextPacketNumber(for: .Application)
+                    print("AckChannelHandler::Write::Setting Packet Number `\(pn)` for TrafficPacket")
+                    // Set the packet number
+                    trafficPacket.header.setPacketNumber(pn.bytes(minBytes: 2, bigEndian: true))
                     // Update the packet
                     packets[i] = trafficPacket
                 default:
