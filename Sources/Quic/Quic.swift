@@ -37,7 +37,7 @@ func isSupported(version: Version) -> Bool {
 let minDatagramSize = { 1200 }()
 let maxConnectionIDLength = { 20 }()
 
-protocol Frame: Sendable {
+protocol Frame: Sendable, Equatable {
     var type: UInt8 { get }
     func encode(into buffer: inout ByteBuffer)
 }
@@ -53,5 +53,3 @@ extension Frame {
         return buf
     }
 }
-
-struct Frames { }

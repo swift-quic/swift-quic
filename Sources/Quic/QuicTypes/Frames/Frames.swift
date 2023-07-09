@@ -14,8 +14,31 @@
 
 import NIOCore
 
-extension Frames {
+enum Frames:Equatable {
+    case raw(Raw)
+    case padding(Padding)
+    case ping(Ping)
+    case ack(ACK)
+    case resetStream(ResetStream)
+    case stopSending(StopSending)
+    case crypto(Crypto)
+    case newToken(NewToken)
+    case stream(Stream)
+    case maxData(MaxData)
+    case maxStreamData(MaxStreamData)
+    case maxStreams(MaxStreams)
+    case dataBlocked(DataBlocked)
+    case streamDataBlocked(StreamDataBlocked)
+    case streamsBlocked(StreamsBlocked)
+    case newConnectionID(NewConnectionID)
+    case retireConnectionID(RetireConnectionID)
+    case pathChallenge(PathChallenge)
+    case pathResponse(PathResponse)
+    case connectionClose(ConnectionClose)
+    case handshakeDone(HandshakeDone)
+}
 
+extension Frames {
     struct Raw: Frame {
         static var type: UInt8 = UInt8.max
         var type: UInt8 { Self.type }
@@ -40,7 +63,7 @@ extension Frames {
         let length: Int
 
         func encode(into buffer: inout ByteBuffer) {
-            buffer.writeRepeatingByte(0x00, count: self.length)
+            buffer.writeRepeatingByte(type, count: self.length)
         }
     }
 
@@ -96,7 +119,7 @@ extension Frames {
         ///   ACK Range Length (i),
         /// }
         /// ```
-        struct ACKRange {
+        struct ACKRange: Equatable {
             /// A variable-length integer indicating the number of contiguous unacknowledged packets preceding the packet number one lower than the smallest in the preceding ACK Range
             let gap: VarInt
             /// A variable-length integer indicating the number of contiguous acknowledged packets preceding the largest packet number, as determined by the preceding Gap
@@ -118,7 +141,7 @@ extension Frames {
         ///   ECN-CE Count (i),
         /// }
         /// ```
-        struct ECNCounts {
+        struct ECNCounts: Equatable {
             /// A variable-length integer representing the total number of packets received with the ECT(0) codepoint in the packet number space of the ACK frame
             let ect0: VarInt
             /// A variable-length integer representing the total number of packets received with the ECT(1) codepoint in the packet number space of the ACK frame
@@ -589,6 +612,4 @@ extension Frames {
             buffer.writeInteger(self.type)
         }
     }
-
-    // TODO: Extension Frames
 }
