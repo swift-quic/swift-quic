@@ -85,7 +85,7 @@ import XCTest
 /// 3) Build the executable
 /// 4) Run this test
 /// 5) Execute the Go code
-///
+/// - Note: Make sure to comment out / remove the XCTSkip line in the test before running it
 final class QUICExternalDialServerTests: XCTestCase {
     var group: MultiThreadedEventLoopGroup!
     var server: DatagramBootstrap!
@@ -172,7 +172,7 @@ final class QUICExternalDialServerTests: XCTestCase {
             .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .channelInitializer { channel in
                 channel.pipeline.addHandlers([
-                    QuicConnectionMultiplexer(channel: channel, tlsContext: sslServerContext, inboundConnectionInitializer: nil),
+                    QuicConnectionMultiplexer(channel: channel, tlsContext: sslServerContext, idleTimeout: .milliseconds(500), inboundConnectionInitializer: nil),
                     self.serverQuiesceEventRecorder,
                     self.serverErrorHandler
                 ])
