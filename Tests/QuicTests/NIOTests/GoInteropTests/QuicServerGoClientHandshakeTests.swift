@@ -93,66 +93,11 @@ final class QUICExternalDialServerTests: XCTestCase {
     fileprivate var serverErrorHandler: ErrorEventLogger!
     fileprivate var serverQuiesceEventRecorder: QuiesceEventRecorder!
 
-    fileprivate let cert = """
-    -----BEGIN CERTIFICATE-----
-    MIIDXzCCAkegAwIBAgIBATANBgkqhkiG9w0BAQsFADBFMRcwFQYDVQQDDA5xdWlj
-    LWRlbW8tY2VydDELMAkGA1UEBhMCVVMxHTAbBgkqhkiG9w0BCQEWDnRvbXMuMjBA
-    bWUuY29tMB4XDTIyMTIwMTE5MTAyOFoXDTIzMTIwMTE5MTAyOFowRTEXMBUGA1UE
-    AwwOcXVpYy1kZW1vLWNlcnQxCzAJBgNVBAYTAlVTMR0wGwYJKoZIhvcNAQkBFg50
-    b21zLjIwQG1lLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAK7F
-    AZiY/gfS8NOPBF2Zb6ZP7a919drlh5uaKjEipCV1wTuvgtdVoUDmTJr5XlZ8Z6sq
-    hXsCUYQu9drii6fUeyB68Bu/WdOpItXuRjemfiijUI3H6x4dImP3y38M3RqCXcbG
-    +xtKT63zpQeFC5F3x/wQEFCqeB0sVhm4ZKAgWRHLzY9OGOp0+0SeVnlc4p8w/aKe
-    ocqbeVxqI7XFEjhhcZyYU23JeNAoYo2OxJBhjuwHxHrr9FvtbaALDAynDfjxyIL5
-    umNi/CMxn2uhzZqtvl4bfEuIREoTEsR97MphUuq80CxqbpUeQiIpiQsYqOTa80or
-    xp6w3SUBkV+WpyU+lE8CAwEAAaNaMFgwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8B
-    Af8EBAMCAqQwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwEwHQYDVR0OBBYEFKz4Jv3j
-    xQFTYrlBhlq9fnGTv5RgMA0GCSqGSIb3DQEBCwUAA4IBAQBrlzxp8xH0qe99rDMe
-    AyYnbZuaYkAlHkH2ohtTRMvRxaZPhdqqkOEuTefyT3bBzdSMDixh1ZAPZ08AdYyQ
-    4/xW/BMLuvRtnB2qYoG25ql8ASLRjul8SVZ56qmuOcu2FtioZjFD0EDecKBq6Iel
-    DMQH8zT6txageTuFz3RSdYk70EKQ6E1F+nOUWlW5qxJAAfNhS0ZxIf58njrhn4nj
-    1DM2UCfxe2i/tjGUVGoR83zOq8xvUe38WU+8eSddK5WtTfhKRonuywHTQIVhBQlY
-    Y0j95Jvnp03KE8vtRGO1K0DCyseF3F2eqswODCtfjjBW99A+VZ6su7Hqlm/CViaR
-    NXab
-    -----END CERTIFICATE-----
-    """
-
-    fileprivate let privKey = """
-    -----BEGIN PRIVATE KEY-----
-    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCuxQGYmP4H0vDT
-    jwRdmW+mT+2vdfXa5YebmioxIqQldcE7r4LXVaFA5kya+V5WfGerKoV7AlGELvXa
-    4oun1HsgevAbv1nTqSLV7kY3pn4oo1CNx+seHSJj98t/DN0agl3GxvsbSk+t86UH
-    hQuRd8f8EBBQqngdLFYZuGSgIFkRy82PThjqdPtEnlZ5XOKfMP2inqHKm3lcaiO1
-    xRI4YXGcmFNtyXjQKGKNjsSQYY7sB8R66/Rb7W2gCwwMpw348ciC+bpjYvwjMZ9r
-    oc2arb5eG3xLiERKExLEfezKYVLqvNAsam6VHkIiKYkLGKjk2vNKK8aesN0lAZFf
-    lqclPpRPAgMBAAECggEAK2VNlSeABE9TbySW7+rWd1Rnb2b56iWOO4vXKCYy3f5U
-    Qc69zVw80xGcOerriswPLcg8JqQXu5uxfm08QisXe6QrFKi51D2uIbKtisnzj4Gl
-    0d6vOeYAERSJWf3GtPtj76Se21LjYA0ckDZv/enhJWyTsIPzmULWCkLn8X62vx0T
-    w0KtkOLABW6+b+i2TAQoBrJkrrWuGwo5N8K4dvFW64aouJVb+XxzSdCSeakJOGev
-    wGDAMDKSFo7ho5MPjIRRBpuLtpONhXpUXSYBISTr6Nwi/Vw7sa/HXU0OVARjOjyL
-    snb1eXvBEXxvGqNDxUMhgJTSXi/UKSydz2UE8CgQ4QKBgQDdDfmaJNkye6RJYwqK
-    jNPX/Jmf8Zb5EBQrPK7A4Tq2IakwOTzJZs4ZQConN4QI+CFezHVtRU0lEjjvdiYw
-    I+JUgAzyaSdG8IRlu1UCtPNyqkW8nkXu9rQkTputpcv6v5B1Lfx8q5hoEyM56g4M
-    hVT/tXOwULeqSjWPbuA+d8Wj3wKBgQDKZeMi2/FBZW5XTGuTAapfasyeiFsnUyR1
-    kh35uIhpcS/qkVlQFKGl+Q7niJpFytuWToom2+90ueq2d5BoSuRbGAMRWP7/g3Hn
-    b7tVgYhQzY4sI2JQk3QvHbOfw96+fiUqysnBY5ioeA526cE/gFdDjJCmG1ia70x0
-    x9g1+NOdkQKBgC3UHuJRL2Ji9c1tJhtRVP4bVXIucQFTzwqjuwsr5rMpyVzBERQk
-    JyhfAB4/STVe0/RGaTXtPzAnVfx3PzWNyvd/0K9VE5qGdLxumRJFl483M9wF6DPB
-    m9lHHslibSagHn/ct9LU9HTnOs9f8eewoM2evcxY/6rjVbVV5FGvHR97AoGAatVn
-    FEJmUS+aE6h56+noJV95TIELJHHFf+21ttfJ4WZmdXltXFDXloUlcd9wF0DhsbAZ
-    SjOzbLiqBNCNwA8wBEljbSe9yd93I0Od7Z9m9cfasL+oqIF8xVX3N3CrRX/OXI0X
-    ++V3cg2VDP2MDNnQtg4fWB59IaMIh2fpX2vNP5ECgYEAqpjGiLPJq+S39sJ0WASZ
-    GTAbqRMyScBLODwZlKjuCYt1HUFyu6D/HCwdNxRdKdW0vMUsCxadICmy68ogbyK6
-    BD4ObB5VW9Xd8s9Bpdkt8TQ+3zp+vSkezvFDZ0eQFGIGmRRxbNUoMiLjGWCKAp/5
-    27zXnvbAtjbahJNQIClIM+c=
-    -----END PRIVATE KEY-----
-    """
-
     override func setUp() {
         // Configure Server TLS
         var serverConfiguration = TLSConfiguration.makeServerConfiguration(
-            certificateChain: try! NIOSSLCertificate.fromPEMBytes(Array(self.cert.utf8)).map { .certificate($0) },
-            privateKey: .privateKey(try! NIOSSLPrivateKey(bytes: Array(self.privKey.utf8), format: .pem))
+            certificateChain: try! NIOSSLCertificate.fromPEMBytes(Array(TestConstants.CERT.utf8)).map { .certificate($0) },
+            privateKey: .privateKey(try! NIOSSLPrivateKey(bytes: Array(TestConstants.PRIVATE_KEY.utf8), format: .pem))
         )
         serverConfiguration.minimumTLSVersion = .tlsv13
         serverConfiguration.applicationProtocols = ["quic-echo-example"]

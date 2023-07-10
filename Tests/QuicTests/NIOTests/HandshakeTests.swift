@@ -47,21 +47,8 @@ internal final class ErrorEventLogger: ChannelDuplexHandler {
     }
 }
 
-final class QUICHandshakeTests: XCTestCase {
-    var backToBack: BackToBackEmbeddedChannel!
-    var clientInitialBytes: ByteBuffer?
-    let version: Version = .version1
-    var dcid: ConnectionID!
-    var scid: ConnectionID!
-    fileprivate var quicClientHandler: QUICStateHandler!
-    fileprivate var clientErrorHandler: ErrorEventLogger!
-    fileprivate var clientQuiesceEventRecorder: QuiesceEventRecorder!
-
-    fileprivate var quicServer: QuicConnectionMultiplexer!
-    fileprivate var serverErrorHandler: ErrorEventLogger!
-    fileprivate var serverQuiesceEventRecorder: QuiesceEventRecorder!
-
-    fileprivate let cert = """
+struct TestConstants {
+    static let CERT:String = """
     -----BEGIN CERTIFICATE-----
     MIIDXzCCAkegAwIBAgIBATANBgkqhkiG9w0BAQsFADBFMRcwFQYDVQQDDA5xdWlj
     LWRlbW8tY2VydDELMAkGA1UEBhMCVVMxHTAbBgkqhkiG9w0BCQEWDnRvbXMuMjBA
@@ -84,8 +71,8 @@ final class QUICHandshakeTests: XCTestCase {
     NXab
     -----END CERTIFICATE-----
     """
-
-    fileprivate let privKey = """
+    
+    static let PRIVATE_KEY = """
     -----BEGIN PRIVATE KEY-----
     MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCuxQGYmP4H0vDT
     jwRdmW+mT+2vdfXa5YebmioxIqQldcE7r4LXVaFA5kya+V5WfGerKoV7AlGELvXa
@@ -115,6 +102,21 @@ final class QUICHandshakeTests: XCTestCase {
     27zXnvbAtjbahJNQIClIM+c=
     -----END PRIVATE KEY-----
     """
+}
+
+final class QUICHandshakeTests: XCTestCase {
+    var backToBack: BackToBackEmbeddedChannel!
+    var clientInitialBytes: ByteBuffer?
+    let version: Version = .version1
+    var dcid: ConnectionID!
+    var scid: ConnectionID!
+    fileprivate var quicClientHandler: QUICStateHandler!
+    fileprivate var clientErrorHandler: ErrorEventLogger!
+    fileprivate var clientQuiesceEventRecorder: QuiesceEventRecorder!
+
+    fileprivate var quicServer: QuicConnectionMultiplexer!
+    fileprivate var serverErrorHandler: ErrorEventLogger!
+    fileprivate var serverQuiesceEventRecorder: QuiesceEventRecorder!
 
     override func setUp() {
         // Configure QUIC Params
@@ -139,8 +141,8 @@ final class QUICHandshakeTests: XCTestCase {
 
         // Configure Server TLS
         var serverConfiguration = TLSConfiguration.makeServerConfiguration(
-            certificateChain: try! NIOSSLCertificate.fromPEMBytes(Array(self.cert.utf8)).map { .certificate($0) },
-            privateKey: .privateKey(try! NIOSSLPrivateKey(bytes: Array(self.privKey.utf8), format: .pem))
+            certificateChain: try! NIOSSLCertificate.fromPEMBytes(Array(TestConstants.CERT.utf8)).map { .certificate($0) },
+            privateKey: .privateKey(try! NIOSSLPrivateKey(bytes: Array(TestConstants.PRIVATE_KEY.utf8), format: .pem))
         )
         serverConfiguration.minimumTLSVersion = .tlsv13
         serverConfiguration.applicationProtocols = ["h3", "test", "echo"]
