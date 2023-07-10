@@ -48,7 +48,7 @@ internal final class ErrorEventLogger: ChannelDuplexHandler {
 }
 
 struct TestConstants {
-    static let CERT:String = """
+    static let CERT: String = """
     -----BEGIN CERTIFICATE-----
     MIIDXzCCAkegAwIBAgIBATANBgkqhkiG9w0BAQsFADBFMRcwFQYDVQQDDA5xdWlj
     LWRlbW8tY2VydDELMAkGA1UEBhMCVVMxHTAbBgkqhkiG9w0BCQEWDnRvbXMuMjBA
@@ -71,7 +71,7 @@ struct TestConstants {
     NXab
     -----END CERTIFICATE-----
     """
-    
+
     static let PRIVATE_KEY = """
     -----BEGIN PRIVATE KEY-----
     MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCuxQGYmP4H0vDT
