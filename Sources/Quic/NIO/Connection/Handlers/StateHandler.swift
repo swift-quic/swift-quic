@@ -28,7 +28,7 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
     private let ackHandler: ACKChannelHandler
     private let packetProtectorHandler: PacketProtectorHandler
     private let tlsContext: NIOSSLContext
-    private var tlsHandler: NIOSSLHandler
+    private var tlsHandler: NIOSSLHandler!
 
     private(set) var state: QUICConnectionStateMachine
     private(set) var version: Quic.Version
@@ -149,6 +149,8 @@ final class QUICStateHandler: ChannelDuplexHandler, NIOSSLQuicDelegate {
             self.idleTimeoutTask.cancel()
             self.idleTimeoutTask = nil
         }
+        self.streamMultiplexer = nil
+        self.tlsHandler = nil
         self.storedContext = nil
     }
 
