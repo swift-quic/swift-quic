@@ -79,6 +79,7 @@ extension ByteBufferView {
 }
 
 extension ByteBuffer {
+    @inlinable
     func getQuicVarInt(at offset: Int) -> (length: Int, value: UInt64)? {
         // first two bits of the first byte.
         //guard self.readableBytes >= 1 + offset else { print("GetQuicVarInt::Couldn't read first Byte. ReadableBytes: \(self.readableBytes), Offset: \(offset)"); return nil }
